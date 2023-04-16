@@ -1,4 +1,14 @@
-FROM php:7.4-fpm-alpine3.16
+ARG PLATFORM="amd64"
+
+# Load the PHP version and Alpine version from the .env file
+ARG PHP_VERSION=${PHP_VERSION}
+ARG ALPINE_VERSION=${ALPINE_VERSION}
+
+# Pull the PHP image with the specified version and Alpine version
+FROM --platform=$PLATFORM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
+
+# Print the platform
+RUN echo "Building for platform: ${PLATFORM}"
 
 # Add Repositories
 RUN rm -f /etc/apk/repositories &&\
@@ -36,8 +46,8 @@ RUN apk add --update --no-cache \
     libwebp \
     libpng \
     fcgi \
-    su-exec
-
+    su-exec \
+    shadow
 
 # Configure & Install Extension
 RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/include/ --with-webp=/usr/include/ && \
@@ -62,14 +72,6 @@ RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/i
 
 ARG HOST_USER_GID
 ARG HOST_USER_UID
-
-# Change www-data user and group IDs to match the host user and group IDs if the arguments are passed
-RUN if [ -n "$HOST_USER_UID" ] && [ -n "$HOST_USER_GID" ]; then \
-        apk add shadow && \
-        usermod -u $HOST_USER_UID www-data && \
-        groupmod -g $HOST_USER_GID www-data && \
-        apk del shadow; \
-    fi
 
 LABEL afterapk="php-fpm-alpine-$PHP_VERSION"
 
