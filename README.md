@@ -41,6 +41,19 @@ this will enable opcache and php.ini production settings
 HOST_ENV=production
 ```
 
+### build args for arm64
+
+```
+docker-compose build --build-arg PLATFORM=arm64 --build-arg PHP_VERSION=7.4 --build-arg ALPINE_VERSION=3.13
+```
+
+
+### build args for amd64
+
+```
+docker-compose build --build-arg PLATFORM=amd64 --build-arg PHP_VERSION=7.4 --build-arg ALPINE_VERSION=3.13
+```
+
 
 docker-compose.yml
 ```yaml
