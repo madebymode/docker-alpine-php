@@ -62,6 +62,11 @@ docker-compose.yml
     build:
       context: github.com/madebymode/docker-arm64-php74.git
       dockerfile: Dockerfile
+      # pulled from our dotenv - you can override with docker-compose build --build-arg PLATFORM=arm64
+      args:
+        PLATFORM: ${PLATFORM}
+        PHP_VERSION: ${PHP_VERSION}
+        ALPINE_VERSION: ${ALPINE_VERSION}
     # optional: disable if you're running behind a proxy like traefik
     ports:
       - "9000:9000"
