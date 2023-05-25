@@ -1,0 +1,62 @@
+name: Build and push Docker images
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '*'
+
+jobs:
+  multiplatform-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up environment variables
+        run: |
+          set -a
+          source .env
+          set +a
+          for VAR_NAME in PLATFORM PHP_VERSION ALPINE_VERSION; do
+            echo "$VAR_NAME=${!VAR_NAME}" >> $GITHUB_ENV
+          done
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Build and push Docker images (latest)
+        if: github.ref == 'refs/heads/master'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          platforms: ${{ env.PLATFORM }}
+          tags: mxmd/php:${{ env.PHP_VERSION }}
+          build-args: |
+            PHP_VERSION=${{ env.PHP_VERSION }}
+            ALPINE_VERSION=${{ env.ALPINE_VERSION }}
+            ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
+
+      - name: Build and push Docker images (tag)
+        if: github.ref != 'refs/heads/master'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          platforms: ${{ env.PLATFORM }}
+          tags: mxmd/php:${{ env.PHP_VERSION }}
+          build-args: |
+            PHP_VERSION=${{ env.PHP_VERSION }}
+            ALPINE_VERSION=${{ env.ALPINE_VERSION }}
+            ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
