@@ -39,7 +39,7 @@ jobs:
         with:
           context: .
           push: true
-          platforms: ${{ env.PLATFORM }}
+          platforms: linux/amd64,linux/arm64
           tags: mxmd/php:${{ env.PHP_VERSION }}
           build-args: |
             PHP_VERSION=${{ env.PHP_VERSION }}
@@ -52,7 +52,7 @@ jobs:
         with:
           context: .
           push: true
-          platforms: ${{ env.PLATFORM }}
+          platforms: linux/amd64,linux/arm64
           tags: mxmd/php:${{ env.PHP_VERSION }}
           build-args: |
             PHP_VERSION=${{ env.PHP_VERSION }}
