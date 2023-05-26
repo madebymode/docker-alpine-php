@@ -21,16 +21,15 @@ jobs:
       - name: Set matrix for release
         id: set-matrix
         run: |
-          DIRS=$(find . -maxdepth 1 -type d -name '[0-9]*' -printf '%P ' | tr '\n' ',' | sed 's/,$//')
-          DIRS_JSON=$(echo -n '['; for DIR in $DIRS; do echo -n "\"$DIR\","; done; echo -n ']')
-          echo "MATRIX=$DIRS_JSON" >> $GITHUB_ENV
+          DIRS=$(find . -maxdepth 1 -type d -name '[0-9]*' -printf '%P\n')
+          echo "::set-output name=matrix::{\"version\": [${DIRS//[$'\t\r\n ']/\", \"}]}"  # Update the output
 
   create-release-and-build:
     needs: prepare
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ${{ fromJson(env.MATRIX) }}
+        version: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
