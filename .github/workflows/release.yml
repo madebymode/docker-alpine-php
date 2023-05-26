@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ['7.1', '7.4', '8.0', '8.1']  # Specify versions here
+        version: ['7.1', '7.4', '8.0', '8.1', '8.2']  # Specify versions here
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
