@@ -1,13 +1,5 @@
 # cross platform alpine-based php 7.1, 7.4, 8.0, 8.1, 8.2 images
 
-see
-
-- https://github.com/madebymode/docker-alpine-php/tree/7.1
-- https://github.com/madebymode/docker-alpine-php/tree/7.4
-- https://github.com/madebymode/docker-alpine-php/tree/8.0
-- https://github.com/madebymode/docker-alpine-php/tree/8.1
-- https://github.com/madebymode/docker-alpine-php/tree/8.2
-
 ### required ENV
 
  make sure these ENV varaiables exist on your host-machine
