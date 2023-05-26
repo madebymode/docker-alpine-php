@@ -6,10 +6,11 @@ on:
       - 'master'
 
 jobs:
-  prepare:
+  create-release-and-build:
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    strategy:
+      matrix:
+        version: ['7.1', '7.4', '8.0', '8.1']  # Specify versions here
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -17,22 +18,6 @@ jobs:
       - name: Setup GitHub CLI
         run: |
           gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Set matrix for release
-        id: set-matrix
-        run: |
-          DIRS=$(find . -maxdepth 1 -type d -name '[0-9]*' -printf '%P\n')
-          echo "::set-output name=matrix::{\"version\": [${DIRS//[$'\t\r\n ']/\", \"}]}"  # Update the output
-
-  create-release-and-build:
-    needs: prepare
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        version: ${{ fromJson(needs.prepare.outputs.matrix) }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
 
       - name: Create Releases
         run: |
