@@ -1,4 +1,4 @@
-name: Create Releases
+name: Create Releases and Build Docker images
 
 on:
   push:
@@ -6,8 +6,10 @@ on:
       - 'master'
 
 jobs:
-  create-releases:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -16,27 +18,86 @@ jobs:
         run: |
           gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Create Releases and new tag
+      - name: Set matrix for release
+        id: set-matrix
         run: |
-          for DIR in */ ; do
-            DIR=${DIR%*/}      # remove the trailing "/"
-            if [[ -f "$DIR/.env" ]]; then
-              set -a
-              source $DIR/.env
-              set +a
-              TAG_NAME="${PHP_VERSION}"
-              if gh release view $TAG_NAME > /dev/null 2>&1; then
-                echo "Release for $TAG_NAME already exists"
-              else
-                # Create GitHub release if it does not exist
-                gh release create $TAG_NAME \
-                  --title "PHP $PHP_VERSION release" \
-                  --notes "Release of Docker image for PHP $PHP_VERSION"
-                # Create a new tag triggering the "Build and push Docker images" workflow
-                git tag $TAG_NAME
-                git push origin $TAG_NAME
-              fi
+          DIRS=$(find . -maxdepth 1 -type d -name '[0-9]*' -printf '%P\n' | jq -R . | jq -s .)
+          echo "matrix={\"version\": $DIRS}" >> $GITHUB_ENV
+
+  create-release-and-build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create Releases
+        run: |
+          DIR=${{ matrix.version }}
+          if [[ -f "$DIR/.env" ]]; then
+            set -a
+            source $DIR/.env
+            set +a
+            TAG_NAME="${PHP_VERSION}"
+            if ! gh release view $TAG_NAME > /dev/null 2>&1; then
+              # Create GitHub release if it does not exist
+              gh release create $TAG_NAME \
+                --title "PHP $PHP_VERSION release" \
+                --notes "Release of Docker image for PHP $PHP_VERSION"
+              echo "RELEASE_CREATED=true" >> $GITHUB_ENV
             fi
-          done
+          fi
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up environment variables
+        run: |
+          DIR=${{ matrix.version }}
+          if [[ -f "$DIR/.env" ]]; then
+            set -a
+            source $DIR/.env
+            set +a
+            for VAR_NAME in PLATFORM PHP_VERSION ALPINE_VERSION; do
+              echo "$VAR_NAME=${!VAR_NAME}" >> $GITHUB_ENV
+            done
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Build Docker images
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ env.PHP_DIRECTORY }}
+          push: false
+          platforms: linux/amd64,linux/arm64
+          tags: mxmd/php:${{ env.PHP_VERSION }}
+          build-args: |
+            PHP_VERSION=${{ env.PHP_VERSION }}
+            ALPINE_VERSION=${{ env.ALPINE_VERSION }}
+            ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
+
+      - name: Push Docker images (if new tag)
+        if: env.RELEASE_CREATED == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ env.PHP_DIRECTORY }}
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: mxmd/php:${{ env.PHP_VERSION }}
+          build-args: |
+            PHP_VERSION=${{ env.PHP_VERSION }}
+            ALPINE_VERSION=${{ env.ALPINE_VERSION }}
+            ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
