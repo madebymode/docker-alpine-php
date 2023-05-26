@@ -15,8 +15,8 @@ jobs:
       - name: Setup GitHub CLI
         run: |
           gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
-          
-      - name: Create Releases
+
+      - name: Create Releases and new tag
         run: |
           for DIR in */ ; do
             DIR=${DIR%*/}      # remove the trailing "/"
@@ -24,7 +24,7 @@ jobs:
               set -a
               source $DIR/.env
               set +a
-              TAG_NAME="php-${PHP_VERSION}"
+              TAG_NAME="${PHP_VERSION}"
               if gh release view $TAG_NAME > /dev/null 2>&1; then
                 echo "Release for $TAG_NAME already exists"
               else
@@ -32,6 +32,9 @@ jobs:
                 gh release create $TAG_NAME \
                   --title "PHP $PHP_VERSION release" \
                   --notes "Release of Docker image for PHP $PHP_VERSION"
+                # Create a new tag triggering the "Build and push Docker images" workflow
+                git tag $TAG_NAME
+                git push origin $TAG_NAME
               fi
             fi
           done
