@@ -65,7 +65,7 @@ jobs:
       - name: Build Docker images
         uses: docker/build-push-action@v4
         with:
-          context: ${{ env.PHP_DIRECTORY }}
+          context: ./${{ matrix.version }}
           push: false
           platforms: linux/amd64,linux/arm64
           tags: mxmd/php:${{ env.PHP_VERSION }}
@@ -78,7 +78,7 @@ jobs:
         if: env.RELEASE_CREATED == 'true'
         uses: docker/build-push-action@v4
         with:
-          context: ${{ env.PHP_DIRECTORY }}
+          context: ./${{ matrix.version }}
           push: true
           platforms: linux/amd64,linux/arm64
           tags: mxmd/php:${{ env.PHP_VERSION }}
