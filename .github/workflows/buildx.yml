@@ -12,14 +12,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up environment variables
+      - name: Extract PHP version from tag
         run: |
-          set -a
-          source .env
-          set +a
-          for VAR_NAME in PLATFORM PHP_VERSION ALPINE_VERSION; do
-            echo "$VAR_NAME=${!VAR_NAME}" >> $GITHUB_ENV
-          done
+          TAG_REF=${{ github.ref }}
+          FULL_PHP_VERSION=${TAG_REF#refs/tags/}
+          MAJOR_MINOR_PHP_VERSION=${FULL_PHP_VERSION%.*} # Remove .Z part
+          echo "PHP_VERSION=$FULL_PHP_VERSION" >> $GITHUB_ENV
+          echo "PHP_DIRECTORY=$MAJOR_MINOR_PHP_VERSION" >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -33,11 +32,10 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      - name: Build and push Docker images (latest)
-        if: github.ref == 'refs/heads/master'
+      - name: Build and push Docker images (tag)
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: ${{ env.PHP_DIRECTORY }}
           push: true
           platforms: linux/amd64,linux/arm64
           tags: mxmd/php:${{ env.PHP_VERSION }}
@@ -46,15 +44,3 @@ jobs:
             ALPINE_VERSION=${{ env.ALPINE_VERSION }}
             ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
 
-      - name: Build and push Docker images (tag)
-        if: github.ref != 'refs/heads/master'
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: mxmd/php:${{ env.PHP_VERSION }}
-          build-args: |
-            PHP_VERSION=${{ env.PHP_VERSION }}
-            ALPINE_VERSION=${{ env.ALPINE_VERSION }}
-            ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
