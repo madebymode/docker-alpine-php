@@ -21,7 +21,7 @@ jobs:
       - name: Set matrix for release
         id: set-matrix
         run: |
-          DIRS=$(find . -maxdepth 1 -type d -name '[0-9]*' -printf '%P\n' | jq -R . | jq -s .)
+          DIRS=$(find . -maxdepth 1 -type d -name '[0-9]*' -printf '%P ' | tr '\n' ',' | sed 's/,$//')
           echo "matrix={\"version\": $DIRS}" >> $GITHUB_ENV
 
   create-release-and-build:
