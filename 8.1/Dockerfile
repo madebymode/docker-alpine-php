@@ -11,6 +11,7 @@ FROM --platform=$PLATFORM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
 ARG PLATFORM="amd64"
 ARG PHP_VERSION
 ARG ALPINE_VERSION
+ARG DISABLE_HEALTHCHECK=false
 
 # Print the platform
 RUN echo "Building for platform: ${PLATFORM}"
@@ -57,7 +58,8 @@ RUN apk add --update --no-cache \
     libpng \
     fcgi \
     su-exec \
-    shadow
+    shadow \
+    rsync
 
 # Configure & Install Extension
 RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/include/ --with-webp=/usr/include/ && \
@@ -99,9 +101,9 @@ ENV PATH="./vendor/bin:$PATH"
 # Setup Working Dir to model BH
 WORKDIR /
 
-# Add Healthcheck
+# Add a condition for the health check
 HEALTHCHECK --interval=5s --timeout=1s \
-    CMD php-fpm-healthcheck || exit 1
+    CMD if [ -z "$DISABLE_HEALTHCHECK" ]; then php-fpm-healthcheck || exit 1; else exit 0; fi
 
 # Copy entrypoint script
 COPY entrypoint.sh /usr/local/bin/entrypoint
