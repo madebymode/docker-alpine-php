@@ -90,7 +90,7 @@ RUN echo '[www]' > /usr/local/etc/php-fpm.d/status.conf && \
     echo 'pm.status_path = /status' >> /usr/local/etc/php-fpm.d/status.conf
 
 # Health check script
-COPY ../_shared/php-fpm-healthcheck /usr/local/bin/
+COPY _shared/php-fpm-healthcheck /usr/local/bin/
 RUN chmod +x /usr/local/bin/php-fpm-healthcheck
 
 # Install Composer 1.10
@@ -108,7 +108,7 @@ HEALTHCHECK --interval=5s --timeout=1s \
     CMD if [ -z "$DISABLE_HEALTHCHECK" ]; then php-fpm-healthcheck || exit 1; else exit 0; fi
 
 # Copy entrypoint script
-COPY ../_shared/entrypoint.sh /usr/local/bin/entrypoint
+COPY _shared/entrypoint.sh /usr/local/bin/entrypoint
 
 # Set permissions for the entrypoint script
 RUN chmod +x /usr/local/bin/entrypoint

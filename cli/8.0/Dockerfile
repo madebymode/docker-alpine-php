@@ -83,10 +83,6 @@ LABEL afterapk="php-cli-alpine-$PHP_VERSION"
 
 ARG HOST_ENV=development
 
-# Create and configure status.conf for PHP-cli status page
-RUN echo '[www]' > /usr/local/etc/php-cli.d/status.conf && \
-    echo 'pm.status_path = /status' >> /usr/local/etc/php-cli.d/status.conf
-
 # Install Composer 1.10
 RUN curl -sS https://getcomposer.org/installer | php -- --version=1.10.22 --install-dir=/usr/local/bin --filename=composer
 # Install Composer 2
@@ -98,7 +94,7 @@ ENV PATH="./vendor/bin:$PATH"
 WORKDIR /
 
 # Copy entrypoint script
-COPY ../_shared/entrypoint.sh /usr/local/bin/entrypoint
+COPY _shared/entrypoint.sh /usr/local/bin/entrypoint
 
 # Set permissions for the entrypoint script
 RUN chmod +x /usr/local/bin/entrypoint

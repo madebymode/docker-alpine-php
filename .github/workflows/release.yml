@@ -10,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ['7.1', '7.4', '8.0', '8.1', '8.2']  # Specify versions here
+        type: ['cli', 'fpm']
+        version: ['7.1', '7.2', '7.4', '8.0', '8.1', '8.2']
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -21,17 +22,16 @@ jobs:
 
       - name: Create Releases
         run: |
-          DIR=${{ matrix.version }}
+          DIR=${{ matrix.type }}/${{ matrix.version }}
           if [[ -f "$DIR/.env" ]]; then
             set -a
             source $DIR/.env
             set +a
-            TAG_NAME="${PHP_VERSION}"
+            TAG_NAME="${PHP_VERSION}-${{ matrix.type }}"
             if ! gh release view $TAG_NAME > /dev/null 2>&1; then
-              # Create GitHub release if it does not exist
               gh release create $TAG_NAME \
-                --title "PHP $PHP_VERSION release" \
-                --notes "Release of Docker image for PHP $PHP_VERSION"
+                --title "PHP $PHP_VERSION (${{ matrix.type }}) release" \
+                --notes "Release of Docker image for PHP $PHP_VERSION (${{ matrix.type }})"
               echo "RELEASE_CREATED=true" >> $GITHUB_ENV
             fi
           fi
@@ -40,7 +40,7 @@ jobs:
 
       - name: Set up environment variables
         run: |
-          DIR=${{ matrix.version }}
+          DIR=${{ matrix.type }}/${{ matrix.version }}
           if [[ -f "$DIR/.env" ]]; then
             set -a
             source $DIR/.env
@@ -65,24 +65,26 @@ jobs:
       - name: Build Docker images
         uses: docker/build-push-action@v4
         with:
-          context: ./${{ matrix.version }}
+          context: ./${{ matrix.type }}
           push: false
           platforms: linux/amd64,linux/arm64
-          tags: mxmd/php:${{ env.PHP_VERSION }}
+          tags: mxmd/php:${{ env.PHP_VERSION }}-${{ matrix.type }}
           build-args: |
             PHP_VERSION=${{ env.PHP_VERSION }}
             ALPINE_VERSION=${{ env.ALPINE_VERSION }}
             ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
+          file: ${{ matrix.type }}/${{ matrix.version }}/Dockerfile  # Specify the Dockerfile location
 
       - name: Push Docker images (if new tag)
         if: env.RELEASE_CREATED == 'true'
         uses: docker/build-push-action@v4
         with:
-          context: ./${{ matrix.version }}
+          context: ./${{ matrix.type }}
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: mxmd/php:${{ env.PHP_VERSION }}
+          tags: mxmd/php:${{ env.PHP_VERSION }}-${{ matrix.type }}
           build-args: |
             PHP_VERSION=${{ env.PHP_VERSION }}
             ALPINE_VERSION=${{ env.ALPINE_VERSION }}
             ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
+          file: ${{ matrix.type }}/${{ matrix.version }}/Dockerfile  # Specify the Dockerfile location
