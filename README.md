@@ -1,4 +1,4 @@
-# cross platform alpine-based php 7.1, 7.4, 8.0, 8.1, 8.2 images
+# cross platform alpine-based php 7.1 - 8.2 images
 
 ### required ENV
 
