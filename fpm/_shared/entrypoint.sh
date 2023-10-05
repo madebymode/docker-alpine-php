@@ -33,5 +33,10 @@ if [ "$EXEC_AS_ROOT" = "true" ] || [ "$EXEC_AS_ROOT" = "1" ] || [ "$1" = "php-fp
     COMMAND="exec"
 fi
 
+# Disable the health check if $1 isn't php-fpm
+if [ "$1" != "php-fpm" ]; then
+    export DISABLE_HEALTHCHECK=true
+fi
+
 # Execute the passed command with the correct user
 $COMMAND "$@"

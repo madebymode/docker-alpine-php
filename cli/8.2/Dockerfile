@@ -11,7 +11,6 @@ FROM --platform=$PLATFORM php:${PHP_VERSION}-cli-alpine${ALPINE_VERSION}
 ARG PLATFORM="amd64"
 ARG PHP_VERSION
 ARG ALPINE_VERSION
-ARG DISABLE_HEALTHCHECK=false
 
 # Print the platform
 RUN echo "Building for platform: ${PLATFORM}"

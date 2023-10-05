@@ -1,5 +1,21 @@
 #!/bin/bash
 
+TARGET_TYPE=""
+TARGET_VERSION=""
+FORCE_BUILD=false
+
+# Parse command-line arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --type) TARGET_TYPE="$2"; shift ;;
+        --version) TARGET_VERSION="$2"; shift ;;
+        --force) FORCE_BUILD=true ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+
 DATE_CMD=date
 if [[ "$(uname)" == "Darwin" ]]; then
     # If on macOS, check if gdate is available
@@ -64,10 +80,14 @@ docker buildx create --use builder
 TYPES=("cli" "fpm")
 PHP_VERSIONS=("7.1" "7.2" "7.3" "7.4" "8.0" "8.1" "8.2")
 
-# First, loop through PHP versions
-for VERSION in "${PHP_VERSIONS[@]}"; do
-    # Then, loop through the types for each version
-    for TYPE in "${TYPES[@]}"; do
+TARGET_PHP_VERSIONS=("${PHP_VERSIONS[@]}")
+TARGET_TYPES=("${TYPES[@]}")
+
+[ ! -z "$TARGET_VERSION" ] && TARGET_PHP_VERSIONS=("$TARGET_VERSION")
+[ ! -z "$TARGET_TYPE" ] && TARGET_TYPES=("$TARGET_TYPE")
+
+for VERSION in "${TARGET_PHP_VERSIONS[@]}"; do
+    for TYPE in "${TARGET_TYPES[@]}"; do
         DIR="${TYPE}/${VERSION}"
         echo "Processing version: ${VERSION}, type: ${TYPE}"
         if [[ -f "${DIR}/.env" ]]; then
@@ -102,7 +122,9 @@ for VERSION in "${PHP_VERSIONS[@]}"; do
                 echo "Error pulling mxmd/php:${PHP_VERSION}-${TYPE}. Exiting."
                 exit 1
             else
-              if was_created_last_day "mxmd/php:${PHP_VERSION}-${TYPE}"; then
+              if $FORCE_BUILD; then
+                echo "Force build enabled. Building mxmd/php:${PHP_VERSION}-${TYPE} regardless of its creation date."
+              elif was_created_last_day "mxmd/php:${PHP_VERSION}-${TYPE}"; then
                 echo "Image mxmd/php:${PHP_VERSION}-${TYPE} was created within the last day. Skipping build."
                 continue
               fi

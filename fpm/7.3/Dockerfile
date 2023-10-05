@@ -11,7 +11,7 @@ FROM --platform=$PLATFORM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
 ARG PLATFORM
 ARG PHP_VERSION
 ARG ALPINE_VERSION
-ARG DISABLE_HEALTHCHECK=false
+ENV DISABLE_HEALTHCHECK=false
 
 # Print the platform
 RUN echo "Building for platform: ${PLATFORM}"
