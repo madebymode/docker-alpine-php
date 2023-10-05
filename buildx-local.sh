@@ -13,7 +13,8 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
-docker context rm builder
+docker context use default || true
+docker context rm builder || true
 
 docker context create builder
 
@@ -39,13 +40,15 @@ for TYPE in "${TYPES[@]}"; do
             TAG_NAME="mxmd/php:${PHP_VERSION}-${TYPE}"
 
             docker buildx build \
-                --platform linux/amd64,linux/arm64 \
-                --tag "${TAG_NAME}" \
-                --build-arg PHP_VERSION="${PHP_VERSION}" \
-                --build-arg ALPINE_VERSION="${ALPINE_VERSION}" \
-                --build-arg ALPINE_IMAGE="alpine:${ALPINE_VERSION}" \
-                --file "${DIR}/Dockerfile" \
-                cli/
+              --push \
+              --platform linux/amd64,linux/arm64 \
+              --tag "${TAG_NAME}" \
+              --build-arg PHP_VERSION="${PHP_VERSION}" \
+              --build-arg ALPINE_VERSION="${ALPINE_VERSION}" \
+              --build-arg ALPINE_IMAGE="alpine:${ALPINE_VERSION}" \
+              --file "${DIR}/Dockerfile" \
+              cli/
+
         fi
     done
 done
