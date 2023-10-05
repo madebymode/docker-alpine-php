@@ -73,7 +73,6 @@ RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/i
     pdo_mysql \
     sockets \
     zip \
-    opcache \
     && apk del -f .build-deps
 
 ARG HOST_USER_GID

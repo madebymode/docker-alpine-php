@@ -13,6 +13,8 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
+docker context rm builder
+
 docker context create builder
 
 # Enable Docker experimental features
@@ -42,7 +44,6 @@ for TYPE in "${TYPES[@]}"; do
                 --build-arg PHP_VERSION="${PHP_VERSION}" \
                 --build-arg ALPINE_VERSION="${ALPINE_VERSION}" \
                 --build-arg ALPINE_IMAGE="alpine:${ALPINE_VERSION}" \
-                --push \
                 --file "${DIR}/Dockerfile" \
                 cli/
         fi

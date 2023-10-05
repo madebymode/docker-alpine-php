@@ -78,8 +78,7 @@ RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/i
     zip \
     fileinfo \
     soap \
-    phar \
-    opcache && \
+    phar && \
     apk del -f .build-deps
 
 ARG HOST_USER_GID

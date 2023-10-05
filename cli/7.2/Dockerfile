@@ -62,7 +62,7 @@ RUN apk add --update --no-cache \
     rsync
 
 # Configure & Install Extension
-RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/include/ --with-webp=/usr/include/ && \
+RUN docker-php-ext-configure gd --with-jpeg-dir=/usr/include/ --with-freetype-dir=/usr/include/ --with-webp-dir=/usr/include/ && \
     docker-php-ext-install \
     mysqli \
     pdo \
@@ -78,8 +78,7 @@ RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/i
     zip \
     fileinfo \
     soap \
-    phar \
-    opcache && \
+    phar && \
     apk del -f .build-deps
 
 ARG HOST_USER_GID
