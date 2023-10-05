@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  php74-fpm-alpine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PLATFORM: ${PLATFORM}
+        PHP_VERSION: ${PHP_VERSION}
+        ALPINE_VERSION: ${ALPINE_VERSION}
+    image: madebymode/php74-fpm-alpine:latest
+    environment:
+      HOST_ENV: development
+      HOST_USER_UID: 1000
+      HOST_USER_GID: 1000
