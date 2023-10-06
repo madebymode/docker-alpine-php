@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ['7.1', '7.2', '7.3', '7.4', '8.0', '8.1', '8.2']  # Specify versions here
-        type: ['cli', 'fpm']  # Add types here
+        version: ['7.1', '7.2', '7.3', '7.4', '8.0', '8.1', '8.2']
+        type: ['cli', 'fpm']
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -29,7 +29,7 @@ jobs:
             set +a
             TAG_NAME="${PHP_VERSION}-${{ matrix.type }}"
             if ! gh release view $TAG_NAME > /dev/null 2>&1; then
-              # Create GitHub release if it does not exist
+              # Create GH Release if it does not exist
               gh release create $TAG_NAME \
                 --title "PHP $PHP_VERSION (${{ matrix.type }}) release" \
                 --notes "Release of Docker image for PHP $PHP_VERSION (${{ matrix.type }})"
@@ -66,7 +66,7 @@ jobs:
       - name: Build Docker images
         uses: docker/build-push-action@v4
         with:
-          context: ./${{ matrix.type }}  # This sets the build context to either 'cli' or 'fpm' depending on the matrix so we can access _shared/
+          context: ./${{ matrix.type }}
           push: false
           platforms: linux/amd64,linux/arm64
           tags: mxmd/php:${{ env.PHP_VERSION }}-${{ matrix.type }}
@@ -80,7 +80,7 @@ jobs:
         if: env.RELEASE_CREATED == 'true'
         uses: docker/build-push-action@v4
         with:
-          context: ./${{ matrix.type }}  # This sets the build context to either 'cli' or 'fpm' depending on the matrix so we can access _shared/
+          context: ./${{ matrix.type }}
           push: true
           platforms: linux/amd64,linux/arm64
           tags: mxmd/php:${{ env.PHP_VERSION }}-${{ matrix.type }}

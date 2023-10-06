@@ -45,34 +45,23 @@ if [[ "$(uname)" == "Darwin" ]]; then
     fi
 fi
 
-
 # Exit immediately if a command exits with a non-zero status
 set -e
 
 # Handle script termination gracefully
 cleanup() {
     echo "Cleaning up..."
-    docker context use default
-    docker context rm builder
     exit
 }
 
-# Function to check when the image was last created locally
 was_created_last_day() {
     local image="$1"
-
-    # Get the image creation time using docker inspect
     local timestamp=$(docker inspect --format '{{.Created}}' "$image")
-
-    # Convert the timestamp to seconds
     local created_time=$($DATE_CMD --date="$timestamp" +%s)
     local current_time=$($DATE_CMD +%s)
     local one_day_in_seconds=86400
-
-    # Calculate the difference in time
     local time_diff=$((current_time - created_time))
 
-    # If the time difference is less than a day (86400 seconds), return 0 (true)
     if [ "$time_diff" -lt "$one_day_in_seconds" ]; then
         return 0
     else
@@ -82,17 +71,6 @@ was_created_last_day() {
 
 trap 'echo "Error on line $LINENO"' ERR
 trap cleanup SIGINT SIGTERM
-
-docker context use default || true
-docker context rm builder || true
-
-docker context create builder
-
-# Enable Docker experimental features
-export DOCKER_CLI_EXPERIMENTAL=enabled
-
-# Create a new builder instance
-docker buildx create --use builder
 
 # Variables
 TYPES=("cli" "fpm")
@@ -114,46 +92,29 @@ for VERSION in "${TARGET_PHP_VERSIONS[@]}"; do
             source "${DIR}/.env"
             set +a
 
-            TAG_NAME="mxmd/php:${PHP_VERSION}-${TYPE}"
+            TAG_NAME="mode-dev/php:${PHP_VERSION}-${TYPE}"
 
-            # Disable the 'exit on error' behavior
+            # Check if the image exists locally
             set +e
-
-            # Attempt to pull the image and capture the output/error
-            PULL_OUTPUT=$(docker pull "mxmd/php:${PHP_VERSION}-${TYPE}" 2>&1)
-            PULL_STATUS=$?
-
-            # Print the output for debugging
-            echo "Pull output for mxmd/php:${PHP_VERSION}-${TYPE}:"
-            echo "--------------------------------------"
-            echo "$PULL_OUTPUT"
-            echo "--------------------------------------"
-
-            # Check for "No such object" error in the pull output
-            if [[ $PULL_OUTPUT == *"Error: No such object:"* ]]; then
-                echo "Warning: Image mxmd/php:${PHP_VERSION}-${TYPE} not found."
-            # Check for "manifest unknown" error in the pull output
-            elif [[ $PULL_OUTPUT == *"manifest unknown: manifest unknown"* ]]; then
-                echo "Warning: Image mxmd/php:${PHP_VERSION}-${TYPE} manifest unknown."
-            # Check for other errors based on the pull command exit status
-            elif [[ $PULL_STATUS -ne 0 ]]; then
-                echo "Error pulling mxmd/php:${PHP_VERSION}-${TYPE}. Exiting."
-                exit 1
-            else
-              if $FORCE_BUILD; then
-                echo "Force build enabled. Building mxmd/php:${PHP_VERSION}-${TYPE} regardless of its creation date."
-              elif was_created_last_day "mxmd/php:${PHP_VERSION}-${TYPE}"; then
-                echo "Image mxmd/php:${PHP_VERSION}-${TYPE} was created within the last day. Skipping build."
-                continue
-              fi
-            fi
-
-            # Exit immediately if a command exits with a non-zero status
+            docker inspect "$TAG_NAME" > /dev/null 2>&1
+            IMAGE_EXISTS=$?
             set -e
 
-            docker buildx build \
-              --push \
-              --platform linux/amd64,linux/arm64 \
+            if [[ $IMAGE_EXISTS -ne 0 ]]; then
+                echo "Image $TAG_NAME doesn't exist locally. Building..."
+            else
+                if $FORCE_BUILD; then
+                    echo "Force build enabled. Building $TAG_NAME regardless of its creation date."
+                elif was_created_last_day "$TAG_NAME"; then
+                    echo "Image $TAG_NAME was created within the last day. Skipping build."
+                    continue
+                else
+                    echo "Image $TAG_NAME is older than a day. Building..."
+                fi
+            fi
+
+            # Build the Docker image locally
+            docker build \
               --tag "${TAG_NAME}" \
               --build-arg PHP_VERSION="${PHP_VERSION}" \
               --build-arg ALPINE_VERSION="${ALPINE_VERSION}" \
@@ -164,5 +125,7 @@ for VERSION in "${TARGET_PHP_VERSIONS[@]}"; do
         fi
     done
 done
+
+
 
 cleanup
