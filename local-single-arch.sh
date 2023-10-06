@@ -69,7 +69,6 @@ was_created_last_day() {
     fi
 }
 
-trap 'echo "Error on line $LINENO"' ERR
 trap cleanup SIGINT SIGTERM
 
 # Variables
@@ -92,13 +91,29 @@ for VERSION in "${TARGET_PHP_VERSIONS[@]}"; do
             source "${DIR}/.env"
             set +a
 
+            echo "PHP_VERSION: ${PHP_VERSION}"
+            echo "ALPINE_VERSION: ${ALPINE_VERSION}"
+
+
             TAG_NAME="mode-dev/php:${PHP_VERSION}-${TYPE}"
+
+            echo "TAG_NAME: ${TAG_NAME}"
+            echo "DIR: ${DIR}"
+            echo "Build context: $TYPE/"
+
 
             # Check if the image exists locally
             set +e
-            docker inspect "$TAG_NAME" > /dev/null 2>&1
+
+            echo "Inspecting image: $TAG_NAME"
+            ERROR_MSG=$(docker inspect "$TAG_NAME" 2>&1)
             IMAGE_EXISTS=$?
+            if [ $IMAGE_EXISTS -ne 0 ]; then
+                echo "Error inspecting image: $ERROR_MSG"
+            fi
+
             set -e
+
 
             if [[ $IMAGE_EXISTS -ne 0 ]]; then
                 echo "Image $TAG_NAME doesn't exist locally. Building..."
@@ -111,6 +126,13 @@ for VERSION in "${TARGET_PHP_VERSIONS[@]}"; do
                 else
                     echo "Image $TAG_NAME is older than a day. Building..."
                 fi
+            fi
+
+            if [[ -f "${DIR}/Dockerfile" ]]; then
+                echo "${DIR}/Dockerfile exists"
+            else
+                echo "Error: ${DIR}/Dockerfile does not exist"
+                exit 1
             fi
 
             # Build the Docker image locally

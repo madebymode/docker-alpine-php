@@ -52,9 +52,9 @@ set -e
 # Handle script termination gracefully
 cleanup() {
     echo "Cleaning up..."
-    docker context use default
-    docker context rm builder
-    exit
+    docker context use default || true
+    docker builder ls | awk 'NR>1 {print $1}' | grep -v "default" | grep -v "builder" | xargs -I {} docker builder rm {} || true
+    docker context rm builder || true
 }
 
 # Function to check when the image was last created locally
@@ -83,8 +83,7 @@ was_created_last_day() {
 trap 'echo "Error on line $LINENO"' ERR
 trap cleanup SIGINT SIGTERM
 
-docker context use default || true
-docker context rm builder || true
+cleanup
 
 docker context create builder
 
@@ -166,3 +165,4 @@ for VERSION in "${TARGET_PHP_VERSIONS[@]}"; do
 done
 
 cleanup
+exit;
