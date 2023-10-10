@@ -6,6 +6,8 @@ if [ "$HOST_ENV" = "production" ]; then
         mv "$PHP_INI_DIR/conf.d/docker-php-ext-opcache.disabled" "$PHP_INI_DIR/conf.d/docker-php-ext-opcache.ini"
     fi
     ln -sf "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/conf.d/php.ini"
+    # Hide PHP version in headers for production
+    sed -i 's/^expose_php = On/expose_php = Off/' "$PHP_INI_DIR/conf.d/php.ini"
     echo "Production mode enabled"
 else
     if [ -f "$PHP_INI_DIR/conf.d/docker-php-ext-opcache.ini" ]; then
