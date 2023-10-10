@@ -1,11 +1,9 @@
-ARG PLATFORM="amd64"
-
 # Load the PHP version and Alpine version from the .env file
 ARG PHP_VERSION=${PHP_VERSION}
 ARG ALPINE_VERSION=${ALPINE_VERSION}
 
 # Pull the PHP image with the specified version and Alpine version
-FROM --platform=$PLATFORM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
+FROM --platform=$TARGETPLATFORM  php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
 
 # Redefine the ARGs after FROM
 ARG PLATFORM
