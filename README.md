@@ -1,7 +1,5 @@
 # cross platform alpine-based php 7.1 - 8.2 images
 
----
-
 ## Container Runtimes
 
 ### Using Docker PHP Images from Docker Hub
@@ -43,7 +41,35 @@ You can integrate our PHP images into your Docker Compose workflows:
 ```yaml
 services:
   php74-fpm:
+    platform: linux/arm64/v8
     image: mxmd/php:7.4.33-fpm
+    ports:
+      - "9000:9000"
+    volumes:
+      # real time sync for app php files
+      - .:/app
+      # cache laravel libraries dir
+      - ./vendor:/app/vendor:cached
+      # logs and sessions should be authorative inside docker
+      - ./storage:/app/storage:delegated
+      # cache static assets bc fpm doesn't need to update css or js
+      - ./public:/app/public:cached
+      # additional php config
+      - ./docker-conf/php-ini:/usr/local/etc/php/custom.d
+    env_file:
+      - .env
+    environment:
+      # tell PHP to scan for our mounted custom ini files - preferabbly mount with zz-custom.ini
+      - PHP_INI_SCAN_DIR=/usr/local/etc/php/conf.d/:/usr/local/etc/php/custom.d
+      # composer
+      - COMPOSER_AUTH=${COMPOSER_AUTH}
+      # these are CRITICAL for linux hosts - our entrypoint will skip these for macOS if they conflict with GID:20 on the container
+      - HOST_USER_UID=${HOST_USER_UID:-1000}
+      - HOST_USER_GID=${HOST_USER_GID:-1000}
+      # production flag will enable opcache and production php.ini settings
+      - HOST_ENV=${HOST_ENV:-production}
+      # our entrypoint uses the www-data user for cmd entry that's not php-fpm - swap to EXEC_AS_ROOT=1 if you wanna exec as the root user
+      - EXEC_AS_ROOT=0
     ...
   php74-cli:
     image: mxmd/php:7.4.33-cli
