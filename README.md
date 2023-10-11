@@ -1,5 +1,97 @@
 # cross platform alpine-based php 7.1 - 8.2 images
 
+---
+
+## Container Runtimes
+
+### Using Docker PHP Images from Docker Hub
+
+This repository builds and publishes PHP images optimized for both CLI and FPM use cases, tailored for various PHP versions and their minor releases. Our images are compatible with both ARM64 and x86_64 host architectures and integrate seamlessly with Laravel and other PHP frameworks.
+
+#### Pulling our PHP Docker Images
+
+To get a specific version of our PHP image, use:
+
+```bash
+docker pull mxmd/php:<VERSION>-<TYPE>
+```
+
+Where:
+- `<VERSION>` is the desired PHP version along with its minor version (e.g., `7.1.33`, `8.0.29`).
+- `<TYPE>` is either `cli` or `fpm`.
+
+For example, to pull the PHP 7.4.33 FPM image:
+
+```bash
+docker pull mxmd/php:7.4.33-fpm
+```
+
+Available versions of our images along with their Docker Hub links:
+
+- [7.1.33-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.1.33-cli), [7.1.33-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.1.33-fpm)
+- [7.2.34-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.2.34-cli), [7.2.34-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.2.34-fpm)
+- [7.3.33-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.3.33-cli), [7.3.33-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.3.33-fpm)
+- [7.4.33-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.4.33-cli), [7.4.33-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.4.33-fpm)
+- [8.0.29-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.0.29-cli), [8.0.29-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.0.29-fpm)
+- [8.1.24-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.1.24-cli), [8.1.24-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.1.24-fpm)
+- [8.2.10-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.2.10-cli), [8.2.10-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.2.10-fpm)
+
+#### Usage with Docker Compose
+
+You can integrate our PHP images into your Docker Compose workflows:
+
+```yaml
+services:
+  php74-fpm:
+    image: mxmd/php:7.4.33-fpm
+    ...
+  php74-cli:
+    image: mxmd/php:7.4.33-cli
+    ...
+```
+
+**Note**: Adjust volume paths or environment variables as per your project's requirements.
+
+### Required Environment Variables
+
+Ensure these environment variables exist on your host machine:
+
+```bash
+HOST_USER_GID
+HOST_USER_UID
+```
+
+#### Setting these Environment Variables
+
+On `macOS`, you can set them in `~/.extra` or `~/.bash_profile`.
+
+To get `HOST_USER_UID`:
+
+```bash
+id -u
+```
+
+To get `HOST_USER_GID`:
+
+```bash
+id -g
+```
+
+To set these on your host machine:
+
+```bash
+echo "export HOST_USER_GID=$(id -g)" >> ~/.bash_profile && echo "export HOST_USER_UID=$(id -u)" >> ~/.bash_profile && echo "export DOCKER_USER=$(id -u):$(id -g)" >> ~/.bash_profile
+```
+
+### Optional Environment Variables
+
+Enabling the following environment variable activates the opcache and uses `php.ini` production settings:
+
+```ini
+HOST_ENV=production
+```
+---
+
 ## Building Images:
 
 ### Flags:
@@ -86,45 +178,3 @@ The workflow requires the following secrets:
 - `DOCKER_HUB_ACCESS_TOKEN`: A token or password for Docker Hub to authenticate and push images.
 
 
----
-
-## Container Runtimes
-
-### required ENV
-
- make sure these ENV varaiables exist on your host-machine
-
-```
-HOST_USER_GID
-HOST_USER_UID
-```
-#### set these env vars
-
-ie on `macOS` in `~/.extra` or `~/.bash_profile`
-
-get `HOST_USER_UID`
-
-```
-id -u
-```
-
-
-get `HOST_USER_GID`
-```
-id -g
-```
-
-
-### host machine
-```
-echo "export HOST_USER_GID=$(id -g)" >> ~/.bash_profile && echo "export HOST_USER_UID=$(id -u)" >> ~/.bash_profile && echo "export DOCKER_USER=$(id -u):$(id -g)" >> ~/.bash_profile
-```
-
-
-### optional ENV
-
-this will enable opcache and php.ini production settings
-
-```ini
-HOST_ENV=production
-```
