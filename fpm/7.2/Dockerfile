@@ -1,5 +1,3 @@
-
-
 # Load the PHP version and Alpine version from the .env file
 ARG PHP_VERSION=${PHP_VERSION}
 ARG ALPINE_VERSION=${ALPINE_VERSION}
@@ -8,13 +6,9 @@ ARG ALPINE_VERSION=${ALPINE_VERSION}
 FROM --platform=$TARGETPLATFORM  php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
 
 # Redefine the ARGs after FROM
-ARG PLATFORM
 ARG PHP_VERSION
 ARG ALPINE_VERSION
 ENV DISABLE_HEALTHCHECK=false
-
-# Print the platform
-RUN echo "Building for platform: ${PLATFORM}"
 
 # Add Repositories
 RUN rm -f /etc/apk/repositories &&\

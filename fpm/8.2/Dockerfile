@@ -11,9 +11,6 @@ ARG PHP_VERSION
 ARG ALPINE_VERSION
 ENV DISABLE_HEALTHCHECK=false
 
-# Print the platform
-RUN echo "Building for platform: ${PLATFORM}"
-
 # Add Repositories
 RUN rm -f /etc/apk/repositories &&\
     echo "http://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main" >> /etc/apk/repositories && \

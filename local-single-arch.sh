@@ -4,6 +4,7 @@ TARGET_TYPE=""
 TARGET_VERSION=""
 FORCE_BUILD=false
 BUILD_ALL=false
+TARGETPLATFORM=linux/amd64
 
 # Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
@@ -12,6 +13,7 @@ while [[ "$#" -gt 0 ]]; do
         --version) TARGET_VERSION="$2"; shift ;;
         --force) FORCE_BUILD=true ;;
         --all) BUILD_ALL=true ;;
+        --platform) TARGETPLATFORM="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -100,6 +102,7 @@ for VERSION in "${TARGET_PHP_VERSIONS[@]}"; do
             echo "TAG_NAME: ${TAG_NAME}"
             echo "DIR: ${DIR}"
             echo "Build context: $TYPE/"
+            echo "Platform: $TARGETPLATFORM"
 
 
             # Check if the image exists locally
@@ -141,6 +144,7 @@ for VERSION in "${TARGET_PHP_VERSIONS[@]}"; do
               --build-arg PHP_VERSION="${PHP_VERSION}" \
               --build-arg ALPINE_VERSION="${ALPINE_VERSION}" \
               --build-arg ALPINE_IMAGE="alpine:${ALPINE_VERSION}" \
+              --build-arg TARGETPLATFORM="${TARGETPLATFORM}" \
               --file "${DIR}/Dockerfile" \
               $TYPE/
 

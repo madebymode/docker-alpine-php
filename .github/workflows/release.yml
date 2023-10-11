@@ -28,7 +28,7 @@ jobs:
             source $DIR/.env
             set +a
             TAG_NAME="${PHP_VERSION}-${{ matrix.type }}"
-            DOCKER_HUB_LINK="https://hub.docker.com/layers/mxmd/php/${PHP_VERSION}-${{ matrix.type }}/"
+            DOCKER_HUB_LINK="https://hub.docker.com/r/mxmd/php/tags?page=1&name=${PHP_VERSION}-${{ matrix.type }}/"
             if ! gh release view $TAG_NAME > /dev/null 2>&1; then
               # Create GH Release if it does not exist
               gh release create $TAG_NAME \

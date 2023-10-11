@@ -6,13 +6,8 @@ ARG ALPINE_VERSION=${ALPINE_VERSION}
 FROM --platform=$TARGETPLATFORM  php:${PHP_VERSION}-cli-alpine${ALPINE_VERSION}
 
 # Redefine the ARGs after FROM
-ARG PLATFORM
 ARG PHP_VERSION
 ARG ALPINE_VERSION
-
-
-# Print the platform
-RUN echo "Building for platform: ${PLATFORM}"
 
 # Add Repositories
 RUN rm -f /etc/apk/repositories &&\

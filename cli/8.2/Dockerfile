@@ -10,9 +10,6 @@ FROM --platform=$TARGETPLATFORM  php:${PHP_VERSION}-cli-alpine${ALPINE_VERSION}
 ARG PHP_VERSION
 ARG ALPINE_VERSION
 
-# Print the platform
-RUN echo "Building for platform: ${PLATFORM}"
-
 # Add Repositories
 RUN rm -f /etc/apk/repositories &&\
     echo "http://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main" >> /etc/apk/repositories && \
