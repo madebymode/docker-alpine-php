@@ -50,7 +50,15 @@ jobs:
             for VAR_NAME in PLATFORM PHP_VERSION PHP_VERSION_MAJOR ALPINE_VERSION; do
               echo "$VAR_NAME=${!VAR_NAME}" >> $GITHUB_ENV
             done
+          else
+            echo "No .env file found in $DIR" >&2
+            exit 1
           fi
+
+      - name: Print environment variables for debugging
+        run: |
+          echo "PHP_VERSION: $PHP_VERSION"
+          echo "PHP_VERSION_MAJOR: $PHP_VERSION_MAJOR"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
