@@ -47,7 +47,7 @@ jobs:
             set -a
             source $DIR/.env
             set +a
-            for VAR_NAME in PLATFORM PHP_VERSION ALPINE_VERSION; do
+            for VAR_NAME in PLATFORM PHP_VERSION PHP_VERSION_MAJOR ALPINE_VERSION; do
               echo "$VAR_NAME=${!VAR_NAME}" >> $GITHUB_ENV
             done
           fi
