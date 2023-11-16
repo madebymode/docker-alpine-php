@@ -70,9 +70,12 @@ jobs:
           context: ./${{ matrix.type }}
           push: false
           platforms: linux/amd64,linux/arm64
-          tags: mxmd/php:${{ env.PHP_VERSION }}-${{ matrix.type }}
+        tags: |
+            mxmd/php:${{ env.PHP_VERSION }}-${{ matrix.type }}
+            mxmd/php:${{ env.PHP_VERSION_MAJOR }}-${{ matrix.type }}
           build-args: |
             PHP_VERSION=${{ env.PHP_VERSION }}
+            PHP_VERSION_MAJOR=${{ env.PHP_VERSION_MAJOR }}
             ALPINE_VERSION=${{ env.ALPINE_VERSION }}
             ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
           file: ${{ matrix.type }}/${{ matrix.version }}/Dockerfile
@@ -84,9 +87,12 @@ jobs:
           context: ./${{ matrix.type }}
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: mxmd/php:${{ env.PHP_VERSION }}-${{ matrix.type }}
+        tags: |
+            mxmd/php:${{ env.PHP_VERSION }}-${{ matrix.type }}
+            mxmd/php:${{ env.PHP_VERSION_MAJOR }}-${{ matrix.type }}
           build-args: |
             PHP_VERSION=${{ env.PHP_VERSION }}
+            PHP_VERSION_MAJOR=${{ env.PHP_VERSION_MAJOR }}
             ALPINE_VERSION=${{ env.ALPINE_VERSION }}
             ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
           file: ${{ matrix.type }}/${{ matrix.version }}/Dockerfile

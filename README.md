@@ -15,7 +15,7 @@ docker pull mxmd/php:<VERSION>-<TYPE>
 ```
 
 Where:
-- `<VERSION>` is the desired PHP version along with its minor version (e.g., `7.1.33`, `8.0.29`).
+- `<VERSION>` is the desired PHP version along with its minor version (e.g., `7.1.33`, `8.0.30`).
 - `<TYPE>` is either `cli` or `fpm`.
 
 For example, to pull the PHP 7.4.33 FPM image:
@@ -30,9 +30,9 @@ Available versions of our images along with their Docker Hub links:
 - [7.2.34-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.2.34-cli), [7.2.34-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.2.34-fpm)
 - [7.3.33-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.3.33-cli), [7.3.33-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.3.33-fpm)
 - [7.4.33-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.4.33-cli), [7.4.33-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.4.33-fpm)
-- [8.0.29-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.0.29-cli), [8.0.29-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.0.29-fpm)
-- [8.1.24-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.1.24-cli), [8.1.24-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.1.24-fpm)
-- [8.2.10-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.2.10-cli), [8.2.10-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.2.10-fpm)
+- [8.0.30-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.0.30-cli), [8.0.30-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.0.30-fpm)
+- [8.1.25-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.1.25-cli), [8.1.25-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.1.25-fpm)
+- [8.2.12-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.2.12-cli), [8.2.12-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.2.12-fpm)
 
 #### Usage with Docker Compose
 
