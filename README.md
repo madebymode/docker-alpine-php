@@ -31,8 +31,8 @@ Available versions of our images along with their Docker Hub links:
 - [7.3.33-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.3.33-cli), [7.3.33-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.3.33-fpm)
 - [7.4.33-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.4.33-cli), [7.4.33-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:7.4.33-fpm)
 - [8.0.30-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.0.30-cli), [8.0.30-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.0.30-fpm)
-- [8.1.25-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.1.25-cli), [8.1.25-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.1.25-fpm)
-- [8.2.12-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.2.12-cli), [8.2.12-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.2.12-fpm)
+- [8.1.26-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.1.26-cli), [8.1.26-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.1.26-fpm)
+- [8.2.13-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.2.13-cli), [8.2.13-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=php:8.2.13-fpm)
 
 #### Usage with Docker Compose
 
