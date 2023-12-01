@@ -45,7 +45,7 @@ HOST_ENV=production
 docker-compose.yml
 ```yaml
   php80:
-    image: mxmb/php-cli-alpine:8.1
+    image: mxmb/php:8.1-cli
     # optional: disable if you're running behind a proxy like traefik
     ports:
       - "9000:9000"
