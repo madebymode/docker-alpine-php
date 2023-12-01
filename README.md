@@ -1,4 +1,4 @@
-# cross platform alpine-based php 7.1 - 8.2 images
+# cross platform alpine-based php 7.1 - 8.3 images
 
 ## Container Runtimes
 
@@ -33,6 +33,7 @@ Available versions of our images along with their Docker Hub links:
 - [8.0.30-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.0.30-cli), [8.0.30-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.0.30-fpm)
 - [8.1.26-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.1.26-cli), [8.1.26-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.1.26-fpm)
 - [8.2.13-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.2.13-cli), [8.2.13-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.2.13-fpm)
+- [8.3.0-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.3.0-cli), [8.3.0-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.3.0-fpm)
 
 #### Usage with Docker Compose
 
