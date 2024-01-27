@@ -14,7 +14,7 @@ jobs:
         type: ['cli', 'fpm']
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup GitHub CLI
         run: |
@@ -61,19 +61,19 @@ jobs:
           echo "PHP_VERSION_MAJOR: $PHP_VERSION_MAJOR"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
       - name: Build Docker images
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: ./${{ matrix.type }}
           push: false
@@ -89,7 +89,7 @@ jobs:
           file: ${{ matrix.type }}/${{ matrix.version }}/Dockerfile
 
       - name: Push Docker images
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: ./${{ matrix.type }}
           push: true
