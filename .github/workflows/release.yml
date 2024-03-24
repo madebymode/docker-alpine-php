@@ -88,6 +88,10 @@ jobs:
             ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
           file: ${{ matrix.type }}/${{ matrix.version }}/Dockerfile
 
+      - name: Generate build timestamp
+        id: build-timestamp
+        run: echo "BUILD_TIMESTAMP=$(date +'%Y%m%d%H%M')" >> $GITHUB_ENV
+
       - name: Push Docker images
         uses: docker/build-push-action@v5
         with:
@@ -97,6 +101,8 @@ jobs:
           tags: |
               mxmd/php:${{ env.PHP_VERSION }}-${{ matrix.type }}
               mxmd/php:${{ env.PHP_VERSION_MAJOR }}-${{ matrix.type }}
+              mxmd/php:${{ env.PHP_VERSION }}-${{ matrix.type }}-${{ env.BUILD_TIMESTAMP }}
+              mxmd/php:${{ env.PHP_VERSION_MAJOR }}-${{ matrix.type }}-${{ env.BUILD_TIMESTAMP }}
           build-args: |
             PHP_VERSION=${{ env.PHP_VERSION }}
             PHP_VERSION_MAJOR=${{ env.PHP_VERSION_MAJOR }}
