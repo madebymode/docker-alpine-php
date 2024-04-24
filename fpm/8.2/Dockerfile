@@ -88,10 +88,14 @@ RUN echo '[www]' > /usr/local/etc/php-fpm.d/status.conf && \
 COPY _shared/php-fpm-healthcheck /usr/local/bin/
 RUN chmod +x /usr/local/bin/php-fpm-healthcheck
 
-# Install Composer 1.10
-RUN curl -sS https://getcomposer.org/installer | php -- --version=1.10.22 --install-dir=/usr/local/bin --filename=composer
-# Install Composer 2
+
+
+# Install Composer with the filename 'composer2'
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer2
+
+# Create a symbolic link named 'composer' that points to 'composer2'
+RUN ln -s /usr/local/bin/composer2 /usr/local/bin/composer
+
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV PATH="./vendor/bin:$PATH"
 
