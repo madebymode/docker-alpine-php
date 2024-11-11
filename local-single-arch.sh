@@ -139,7 +139,7 @@ for VERSION in "${TARGET_PHP_VERSIONS[@]}"; do
             fi
 
             # Build the Docker image locally
-            docker build \
+            docker build --no-cache \
               --tag "${TAG_NAME}" \
               --build-arg PHP_VERSION="${PHP_VERSION}" \
               --build-arg ALPINE_VERSION="${ALPINE_VERSION}" \
