@@ -45,7 +45,7 @@ HOST_ENV=production
 docker-compose.yml
 ```yaml
   php80:
-    image: mxmb/php:8.3-fpm
+    image: mxmb/php:8.4-cli
     # optional: disable if you're running behind a proxy like traefik
     ports:
       - "9000:9000"
@@ -56,7 +56,7 @@ docker-compose.yml
       - ./vendor:/app/vendor:cached
       # logs and sessions should be authorative inside docker
       - ./storage:/app/storage:delegated
-      # cache static assets bc fpm doesn't need to update css or js
+      # cache static assets bc cli doesn't need to update css or js
       - ./public:/app/public:cached
       # additional php config REQUIRED
       - ./docker-conf/php-ini:/usr/local/etc/php/custom.d

@@ -1,4 +1,4 @@
-# cross platform alpine-based php 7.1 - 8.3 images
+# cross platform alpine-based php 7.1 - 8.4 images
 
 ## Container Runtimes
 
@@ -15,7 +15,7 @@ docker pull mxmd/php:<VERSION>-<TYPE>
 ```
 
 Where:
-- `<VERSION>` is the desired PHP major version with the latest minor release (e.g., `7.4`), or you can specify a minor version (e.g., `7.1.33`, `8.0.30`).
+- `<VERSION>` is the desired PHP major version with the latest minor release (e.g., `7.4`), or you can specify a minor version (e.g., `7.1.33`, `8.1.13`).
 - `<TYPE>` is either `cli` or `fpm`.
 
 For example, to pull the PHP 7.4.33 FPM image:
@@ -34,6 +34,8 @@ Available versions of our images along with their Docker Hub links:
 - [8.1-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.1-cli), [8.1-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.1-fpm)
 - [8.2-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.2-cli), [8.2-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.2-fpm)
 - [8.3-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.3-cli), [8.3-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.3-fpm)
+- [8.4-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.4-cli), [8.4-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.4-fpm)
+
 
 #### Usage with Docker Compose
 
