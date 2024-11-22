@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  php83-alpine:
+  php84-alpine:
     build:
       context: .
       dockerfile: Dockerfile
@@ -9,7 +9,7 @@ services:
         PLATFORM: ${PLATFORM}
         PHP_VERSION: ${PHP_VERSION}
         ALPINE_VERSION: ${ALPINE_VERSION}
-    image: madebymode/php83-cli-alpine:latest
+    image: madebymode/php84-cli-alpine:latest
     environment:
       HOST_ENV: development
       HOST_USER_UID: 1000
