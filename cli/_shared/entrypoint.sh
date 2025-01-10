@@ -11,6 +11,19 @@ else
     git config --global --add safe.directory /app
 fi
 
+# Enable or disable SOAP extension based on PHP_ENABLE_SOAP env var
+if [ "$PHP_ENABLE_SOAP" = "true" ] || [ "$PHP_ENABLE_SOAP" = "1" ]; then
+    if [ -f "$PHP_INI_DIR/conf.d/docker-php-ext-soap.disabled" ]; then
+        mv "$PHP_INI_DIR/conf.d/docker-php-ext-soap.disabled" "$PHP_INI_DIR/conf.d/docker-php-ext-soap.ini"
+        echo "SOAP extension enabled"
+    fi
+else
+    if [ -f "$PHP_INI_DIR/conf.d/docker-php-ext-soap.ini" ]; then
+        mv "$PHP_INI_DIR/conf.d/docker-php-ext-soap.ini" "$PHP_INI_DIR/conf.d/docker-php-ext-soap.disabled"
+        echo "SOAP extension disabled"
+    fi
+fi
+
 # bash and sh commands should run as www-data
 COMMAND="exec"
 if [ -n "$HOST_USER_UID" ] && [ -n "$HOST_USER_GID" ] && [ "$(uname)" != "Darwin" ] && [ "$HOST_USER_GID" != "20" ]; then

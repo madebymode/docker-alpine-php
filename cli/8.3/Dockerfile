@@ -67,6 +67,7 @@ RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/i
     mysqli \
     pcntl \
     pdo_mysql \
+    soap \
     sockets \
     zip \
     && apk del -f .build-deps

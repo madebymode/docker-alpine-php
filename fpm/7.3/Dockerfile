@@ -61,6 +61,7 @@ RUN docker-php-ext-configure gd --with-jpeg-dir=/usr/include/ --with-freetype-di
     mysqli \
     pdo \
     pdo_mysql \
+    soap \
     sockets \
     json \
     intl \
