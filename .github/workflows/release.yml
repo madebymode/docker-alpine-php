@@ -97,9 +97,12 @@ jobs:
         run: echo "BUILD_TIMESTAMP=$(date +'%Y%m%d%H%M')" >> $GITHUB_ENV
 
       - name: Push Docker images
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./${{ matrix.type }}
+          provenance: true
+          sbom: true
+          attestations: type=sbom,generator=docker/scout
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
