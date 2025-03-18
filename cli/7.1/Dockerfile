@@ -71,6 +71,7 @@ RUN docker-php-ext-configure gd --with-jpeg-dir=/usr/include/ --with-freetype-di
     bcmath \
     zip \
     fileinfo \
+    soap \
     phar \
     exif && \
     apk del -f .build-deps
