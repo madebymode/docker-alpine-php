@@ -74,6 +74,7 @@ RUN docker-php-ext-configure gd --with-jpeg-dir=/usr/include/ --with-freetype-di
     fileinfo \
     soap \
     phar \
+    exif \
     opcache && \
     apk del -f .build-deps
 
