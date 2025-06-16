@@ -155,7 +155,7 @@ RUN chmod +x /usr/local/bin/php-fpm-healthcheck
 
 # Composer v2
 RUN curl -sS https://getcomposer.org/installer | php \
-      --install-dir=/usr/local/bin --filename=composer2 && \
+      -- --install-dir=/usr/local/bin --filename=composer2 && \
     ln -sf /usr/local/bin/composer2 /usr/local/bin/composer
 
 ENV COMPOSER_ALLOW_SUPERUSER=1
