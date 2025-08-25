@@ -8,7 +8,7 @@ on:
 
 jobs:
   create-release-and-build:
-    runs-on: ubuntu-22.04-20250824.1.0
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         version:
