@@ -59,6 +59,7 @@ RUN apk add --update --no-cache \
     linux-headers
 
 # Configure & Install Extension
+# Note: opcache is built-in to PHP 8.5+ and no longer needs to be installed separately
 RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/include/ --with-webp=/usr/include/ && \
   docker-php-ext-install \
     bcmath \
@@ -71,7 +72,6 @@ RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/i
     soap \
     sockets \
     zip \
-    opcache \
     && apk del -f .build-deps
 
 ARG HOST_USER_GID
