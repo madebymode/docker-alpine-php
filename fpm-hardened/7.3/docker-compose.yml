@@ -1,0 +1,44 @@
+version: '3.8'
+
+volumes:
+  app_storage:
+  app_cache:
+
+services:
+  php-init:
+    build:
+      context: ..
+      dockerfile: 7.3/Dockerfile
+      args:
+        PLATFORM: ${PLATFORM}
+        PHP_VERSION: ${PHP_VERSION}
+        ALPINE_VERSION: ${ALPINE_VERSION}
+    image: mxmd/php:7.3-fpm-hardened
+    user: root
+    volumes:
+      - app_storage:/app/storage
+      - app_cache:/app/bootstrap/cache
+    entrypoint: ["/usr/local/bin/init-permissions"]
+    command: ["/app/storage", "/app/bootstrap/cache"]
+    restart: "no"
+
+  php:
+    build:
+      context: ..
+      dockerfile: 7.3/Dockerfile
+      args:
+        PLATFORM: ${PLATFORM}
+        PHP_VERSION: ${PHP_VERSION}
+        ALPINE_VERSION: ${ALPINE_VERSION}
+    image: mxmd/php:7.3-fpm-hardened
+    depends_on:
+      php-init:
+        condition: service_completed_successfully
+    volumes:
+      - .:/app
+      - app_storage:/app/storage
+      - app_cache:/app/bootstrap/cache
+    environment:
+      HOST_ENV: production
+    ports:
+      - "9000:9000"

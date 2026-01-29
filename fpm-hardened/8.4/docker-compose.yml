@@ -1,0 +1,36 @@
+version: '3.8'
+
+# Production example with host bind mounts
+# Init container sets permissions, FPM runs as non-root
+
+services:
+  # Init container - runs ONCE as root to fix permissions
+  php-init:
+    image: mxmd/php:8.4-fpm-hardened
+    user: root
+    environment:
+      - HOST_USER_UID=${HOST_USER_UID:-1000}
+      - HOST_USER_GID=${HOST_USER_GID:-1000}
+    volumes:
+      - /var/www/myapp/shared/storage:/app/storage
+      - /var/www/myapp/shared/cache:/app/bootstrap/cache
+    entrypoint: ["/usr/local/bin/init-permissions"]
+    command: ["/app/storage", "/app/bootstrap/cache"]
+    restart: "no"
+
+  # FPM - runs as non-root with matching UID
+  php-fpm:
+    image: mxmd/php:8.4-fpm-hardened
+    user: "${HOST_USER_UID:-1000}:${HOST_USER_GID:-1000}"
+    depends_on:
+      php-init:
+        condition: service_completed_successfully
+    volumes:
+      - app_data:/app:ro
+      - /var/www/myapp/shared/storage:/app/storage
+      - /var/www/myapp/shared/cache:/app/bootstrap/cache
+      - /var/www/myapp/shared/.env:/app/.env:ro
+    restart: always
+
+volumes:
+  app_data:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# buildx-local.sh — multi-arch php builds (cli & fpm), tags match the directory name
+# buildx-local.sh — multi-arch php builds (cli, fpm, fpm-hardened), tags match the directory name
 
 # 1) Defaults (before set -u to avoid unbound vars)
 PLATFORMS="linux/amd64"
@@ -52,8 +52,8 @@ done
 [[ "${TARGET_VERSION:-}" == "8.4-msql" ]] && TARGET_VERSION="8.4-mssql"
 
 # 7) Determine matrix
-ALL_TYPES=(cli fpm)
-ALL_VERSIONS=(7.1 7.2 7.3 7.4 8.0 8.1 8.2 8.3 8.4 8.4-mssql)
+ALL_TYPES=(cli fpm fpm-hardened)
+ALL_VERSIONS=(7.1 7.2 7.3 7.4 8.0 8.1 8.2 8.3 8.4 8.4-mssql 8.5)
 
 if   $BUILD_ALL; then
   TYPES=("${ALL_TYPES[@]}")
