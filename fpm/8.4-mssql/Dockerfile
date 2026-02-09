@@ -31,12 +31,10 @@ RUN apk add --no-cache \
       jpegoptim \
       pngquant \
       optipng \
-      vim \
       mysql-client \
       bash \
       shared-mime-info \
       zip \
-      git \
       curl \
       wget \
       gcompat \
