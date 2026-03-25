@@ -203,23 +203,27 @@ jobs:
           IMAGE_TIMESTAMP_REF="mxmd/php:${IMAGE_TAG_PREFIX}-${BUILD_TIMESTAMP}"
           IMAGE_MAJOR_TIMESTAMP_REF="mxmd/php:${PHP_VERSION_MAJOR}${VARIANT}-${{ matrix.type }}-${BUILD_TIMESTAMP}"
           DOCKER_HUB_LINK="https://hub.docker.com/r/mxmd/php/tags?page=1&name=${IMAGE_TAG_PREFIX}"
+          RELEASE_NOTES=$(cat <<EOF
+          Immutable Docker manifest digest for ${IMAGE_REF}
+
+          Docker digest: \`${IMAGE_DIGEST}\`
+          Published tags:
+          - \`${IMAGE_REF}\`
+          - \`${IMAGE_MAJOR_REF}\`
+          - \`${IMAGE_TIMESTAMP_REF}\`
+          - \`${IMAGE_MAJOR_TIMESTAMP_REF}\`
+          Digest references:
+          - \`${IMAGE_REF}@${IMAGE_DIGEST}\`
+          - \`${IMAGE_MAJOR_REF}@${IMAGE_DIGEST}\`
+          - \`${IMAGE_TIMESTAMP_REF}@${IMAGE_DIGEST}\`
+          - \`${IMAGE_MAJOR_TIMESTAMP_REF}@${IMAGE_DIGEST}\`
+          Docker Hub tags: ${DOCKER_HUB_LINK}
+          EOF
+          )
 
           if ! gh release view "${DIGEST_TAG}" > /dev/null 2>&1; then
             gh release create "${DIGEST_TAG}" \
               --target "${GITHUB_SHA}" \
               --title "Docker digest ${DIGEST_TAG}" \
-              --notes "Immutable Docker manifest digest for ${IMAGE_REF}
-
-Docker digest: \`${IMAGE_DIGEST}\`
-Published tags:
-- \`${IMAGE_REF}\`
-- \`${IMAGE_MAJOR_REF}\`
-- \`${IMAGE_TIMESTAMP_REF}\`
-- \`${IMAGE_MAJOR_TIMESTAMP_REF}\`
-Digest references:
-- \`${IMAGE_REF}@${IMAGE_DIGEST}\`
-- \`${IMAGE_MAJOR_REF}@${IMAGE_DIGEST}\`
-- \`${IMAGE_TIMESTAMP_REF}@${IMAGE_DIGEST}\`
-- \`${IMAGE_MAJOR_TIMESTAMP_REF}@${IMAGE_DIGEST}\`
-Docker Hub tags: ${DOCKER_HUB_LINK}"
+              --notes "${RELEASE_NOTES}"
           fi
