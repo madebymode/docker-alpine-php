@@ -6,6 +6,9 @@ on:
       - master
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   create-release-and-build:
     runs-on: ubuntu-latest
@@ -29,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Setup GitHub CLI
         run: |
@@ -73,6 +76,7 @@ jobs:
             else
               echo "VARIANT=" >> $GITHUB_ENV
             fi
+            echo "IMAGE_TAG_PREFIX=${PHP_VERSION}${VARIANT}-${{ matrix.type }}" >> $GITHUB_ENV
           else
             echo "No .env file found in $DIR" >&2
             exit 1
@@ -85,15 +89,15 @@ jobs:
           echo "VARIANT:      $VARIANT"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4.0.0
         with:
           image: tonistiigi/binfmt:qemu-v8.1.5
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4.0.0
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4.0.0
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
@@ -102,7 +106,7 @@ jobs:
 
       - name: Build Docker images (regular)
         if: "!contains(matrix.version, '-mssql')"
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7.0.0
         with:
           context: ./${{ matrix.type }}
           push: false
@@ -119,7 +123,7 @@ jobs:
 
       - name: Build Docker images (MSSQL)
         if: contains(matrix.version, '-mssql')
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7.0.0
         with:
           context: ./${{ matrix.type }}
           push: false
@@ -141,15 +145,16 @@ jobs:
       # ── PUSH ────────────────────────────────────────────────────────────────
 
       - name: Push Docker images (regular)
+        id: push-regular
         if: "!contains(matrix.version, '-mssql')"
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7.0.0
         with:
           context: ./${{ matrix.type }}
           push: true
           platforms: linux/amd64,linux/arm64
           provenance: true
           sbom: true
-          attestations: type=sbom,generator=docker/scout
+          attests: type=sbom,generator=docker/scout
           tags: |
             mxmd/php:${{ env.PHP_VERSION }}-${{ matrix.type }}
             mxmd/php:${{ env.PHP_VERSION_MAJOR }}-${{ matrix.type }}
@@ -163,15 +168,16 @@ jobs:
           file: ${{ matrix.type }}/${{ matrix.version }}/Dockerfile
 
       - name: Push Docker images (MSSQL)
+        id: push-mssql
         if: contains(matrix.version, '-mssql')
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7.0.0
         with:
           context: ./${{ matrix.type }}
           push: true
           platforms: linux/amd64,linux/arm64
           provenance: true
           sbom: true
-          attestations: type=sbom,generator=docker/scout
+          attests: type=sbom,generator=docker/scout
           tags: |
             mxmd/php:${{ env.PHP_VERSION }}${{ env.VARIANT }}-${{ matrix.type }}
             mxmd/php:${{ env.PHP_VERSION_MAJOR }}${{ env.VARIANT }}-${{ matrix.type }}
@@ -183,3 +189,37 @@ jobs:
             ALPINE_VERSION=${{ env.ALPINE_VERSION }}
             ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
           file: ${{ matrix.type }}/${{ matrix.version }}/Dockerfile
+
+      - name: Publish digest tag on GitHub
+        if: ${{ steps.push-regular.outputs.digest != '' || steps.push-mssql.outputs.digest != '' }}
+        env:
+          IMAGE_DIGEST: ${{ steps.push-regular.outputs.digest || steps.push-mssql.outputs.digest }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DIGEST_HEX="${IMAGE_DIGEST#sha256:}"
+          DIGEST_TAG="${IMAGE_TAG_PREFIX}-sha256-${DIGEST_HEX}"
+          IMAGE_REF="mxmd/php:${IMAGE_TAG_PREFIX}"
+          IMAGE_MAJOR_REF="mxmd/php:${PHP_VERSION_MAJOR}${VARIANT}-${{ matrix.type }}"
+          IMAGE_TIMESTAMP_REF="mxmd/php:${IMAGE_TAG_PREFIX}-${BUILD_TIMESTAMP}"
+          IMAGE_MAJOR_TIMESTAMP_REF="mxmd/php:${PHP_VERSION_MAJOR}${VARIANT}-${{ matrix.type }}-${BUILD_TIMESTAMP}"
+          DOCKER_HUB_LINK="https://hub.docker.com/r/mxmd/php/tags?page=1&name=${IMAGE_TAG_PREFIX}"
+
+          if ! gh release view "${DIGEST_TAG}" > /dev/null 2>&1; then
+            gh release create "${DIGEST_TAG}" \
+              --target "${GITHUB_SHA}" \
+              --title "Docker digest ${DIGEST_TAG}" \
+              --notes "Immutable Docker manifest digest for ${IMAGE_REF}
+
+Docker digest: \`${IMAGE_DIGEST}\`
+Published tags:
+- \`${IMAGE_REF}\`
+- \`${IMAGE_MAJOR_REF}\`
+- \`${IMAGE_TIMESTAMP_REF}\`
+- \`${IMAGE_MAJOR_TIMESTAMP_REF}\`
+Digest references:
+- \`${IMAGE_REF}@${IMAGE_DIGEST}\`
+- \`${IMAGE_MAJOR_REF}@${IMAGE_DIGEST}\`
+- \`${IMAGE_TIMESTAMP_REF}@${IMAGE_DIGEST}\`
+- \`${IMAGE_MAJOR_TIMESTAMP_REF}@${IMAGE_DIGEST}\`
+Docker Hub tags: ${DOCKER_HUB_LINK}"
+          fi
