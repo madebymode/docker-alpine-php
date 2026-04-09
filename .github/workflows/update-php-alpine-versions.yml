@@ -1,0 +1,104 @@
+name: Update PHP Alpine Versions
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # Daily at 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-php-alpine-versions:
+    runs-on: ubuntu-latest
+    env:
+      UPDATE_BRANCH: php-alpine-version-updates
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.0.0
+        with:
+          python-version: '3.x'
+
+      - name: Fetch and apply upstream PHP Alpine updates
+        run: python .github/scripts/update_php_alpine_versions.py
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No PHP Alpine updates detected."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo 'summary<<EOF'
+              git diff --stat
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create branch and commit
+        if: steps.diff.outputs.changed == 'true'
+        id: commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "$UPDATE_BRANCH" > /dev/null 2>&1; then
+            git fetch origin "$UPDATE_BRANCH"
+            git checkout -B "$UPDATE_BRANCH" "origin/$UPDATE_BRANCH"
+          else
+            git checkout -b "$UPDATE_BRANCH"
+          fi
+
+          python .github/scripts/update_php_alpine_versions.py
+
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Branch already contains these updates."
+            exit 0
+          fi
+
+          git add cli/ fpm/
+          git commit -m "chore: update tracked PHP Alpine versions $(date +%Y-%m-%d)"
+          git push origin "$UPDATE_BRANCH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "branch=$UPDATE_BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request
+        if: steps.diff.outputs.changed == 'true' && steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIFF_SUMMARY: ${{ steps.diff.outputs.summary }}
+        run: |
+          PR_NUMBER=$(gh pr list --head "$UPDATE_BRANCH" --base master --state open --json number --jq '.[0].number')
+
+          PR_BODY="Docker official-images published newer stable Alpine PHP tags for versions this repo already tracks.
+
+          Matching is exact on image type and Alpine line. Example: \`8.4.19-cli-alpine3.23\` only updates when a newer stable tag such as \`8.4.20-cli-alpine3.23\` appears.
+
+          Source:
+          - ${SOURCE_URL:-https://raw.githubusercontent.com/docker-library/official-images/refs/heads/master/library/php}
+
+          Diff summary:
+          \`\`\`
+          ${DIFF_SUMMARY}
+          \`\`\`"
+
+          if [[ -n "$PR_NUMBER" ]]; then
+            gh pr edit "$PR_NUMBER" \
+              --title "chore: update tracked PHP Alpine versions" \
+              --body "$PR_BODY"
+          else
+            gh pr create \
+              --head "$UPDATE_BRANCH" \
+              --base master \
+              --title "chore: update tracked PHP Alpine versions" \
+              --body "$PR_BODY"
+          fi
