@@ -31,11 +31,7 @@ else
 fi
 
 # Modify www-data user and group IDs to match the host user and group IDs if the arguments are passed and not macOS
-if [ "$ROOTLESS_DOCKER" = "1" ]; then
-    echo "Rootless Docker detected, skipping usermod/groupmod"
-    chown -R www-data:www-data /app
-    git config --global --add safe.directory /app
-elif [ -n "$HOST_USER_UID" ] && [ -n "$HOST_USER_GID" ] && [ "$(uname)" != "Darwin" ] && [ "$HOST_USER_GID" != "20" ]; then
+if [ -n "$HOST_USER_UID" ] && [ -n "$HOST_USER_GID" ] && [ "$(uname)" != "Darwin" ] && [ "$HOST_USER_GID" != "20" ]; then
     usermod -u $HOST_USER_UID www-data
     groupmod -g $HOST_USER_GID www-data
 else
@@ -47,7 +43,7 @@ fi
 
 # bash and sh commands should run as www-data
 COMMAND="exec"
-if [ "$ROOTLESS_DOCKER" = "1" ] || { [ -n "$HOST_USER_UID" ] && [ -n "$HOST_USER_GID" ] && [ "$(uname)" != "Darwin" ] && [ "$HOST_USER_GID" != "20" ]; }; then
+if [ -n "$HOST_USER_UID" ] && [ -n "$HOST_USER_GID" ] && [ "$(uname)" != "Darwin" ] && [ "$HOST_USER_GID" != "20" ]; then
     COMMAND="su-exec www-data"
 fi
 # run as root
