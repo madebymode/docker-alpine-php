@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  php-fpm-hardened:
+    build:
+      context: ..
+      dockerfile: 8.4/Dockerfile
+      args:
+        PLATFORM: ${PLATFORM}
+        PHP_VERSION: ${PHP_VERSION}
+        ALPINE_VERSION: ${ALPINE_VERSION}
+    image: mxmd/php:fpm-hardened-8.4
+    user: "${HOST_USER_UID:-1000}:${HOST_USER_GID:-1000}"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    environment:
+      HOST_USER_UID: ${HOST_USER_UID:-1000}
+      HOST_USER_GID: ${HOST_USER_GID:-1000}

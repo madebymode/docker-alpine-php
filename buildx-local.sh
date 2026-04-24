@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
-# buildx-local.sh — multi-arch php builds (cli & fpm), tags match the directory name
 
-# 1) Defaults (before set -u to avoid unbound vars)
 PLATFORMS="linux/amd64"
 TARGET_TYPE=""
 TARGET_VERSION=""
 FORCE_BUILD=false
 BUILD_ALL=false
 
-# Determine date command (macOS support)
 DATE_CMD=date
 if [[ "$(uname)" == "Darwin" ]]; then
   if command -v gdate >/dev/null 2>&1; then
@@ -19,72 +16,64 @@ if [[ "$(uname)" == "Darwin" ]]; then
   fi
 fi
 
-# 2) Strict mode
 set -euo pipefail
 
-# 3) Cleanup on exit
 cleanup() {
   echo "Cleaning up buildx builder & context…" >&2
   docker buildx use default >/dev/null 2>&1 || true
-  docker buildx rm builder   >/dev/null 2>&1 || true
-  docker context rm builder   >/dev/null 2>&1 || true
+  docker buildx rm builder >/dev/null 2>&1 || true
+  docker context rm builder >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
-# 4) QEMU + Buildx setup
 docker run --rm --privileged tonistiigi/binfmt --install all
 docker context inspect builder >/dev/null 2>&1 || docker context create builder
 docker buildx create builder --use --bootstrap
 
-# 5) Parse flags
 while [[ $# -gt 0 ]]; do
   case $1 in
     --type)     TARGET_TYPE="$2"; shift 2 ;;
     --version)  TARGET_VERSION="$2"; shift 2 ;;
-    --all)      BUILD_ALL=true;            shift ;;
-    --force)    FORCE_BUILD=true;          shift ;;
-    --platform) PLATFORMS="$2";            shift 2 ;;
+    --all)      BUILD_ALL=true; shift ;;
+    --force)    FORCE_BUILD=true; shift ;;
+    --platform) PLATFORMS="$2"; shift 2 ;;
     *) echo "Unknown flag: $1" >&2; exit 1 ;;
   esac
 done
 
-# 6) Alias fix (8.4-msql → 8.4-mssql)
+if $BUILD_ALL && [[ -n "$TARGET_TYPE" || -n "$TARGET_VERSION" ]]; then
+  echo "Error: --all cannot be combined with --type or --version" >&2
+  exit 1
+fi
+
+if ! $BUILD_ALL && [[ -z "$TARGET_TYPE" && -z "$TARGET_VERSION" ]]; then
+  echo "Error: specify --all or at least one of --type/--version" >&2
+  exit 1
+fi
+
 [[ "${TARGET_VERSION:-}" == "8.4-msql" ]] && TARGET_VERSION="8.4-mssql"
 
-# 7) Determine matrix
-ALL_TYPES=(cli fpm)
-ALL_VERSIONS=(7.1 7.2 7.3 7.4 8.0 8.1 8.2 8.3 8.4 8.4-mssql)
+collect_targets() {
+  find . -path './.git' -prune -o -mindepth 2 -maxdepth 2 -type d -print | sort | while read -r dir; do
+    local type="${dir#./}"
+    type="${type%/*}"
+    local version="${dir##*/}"
 
-if   $BUILD_ALL; then
-  TYPES=("${ALL_TYPES[@]}")
-  VERSIONS=("${ALL_VERSIONS[@]}")
-elif [[ -n "$TARGET_TYPE" && -n "$TARGET_VERSION" ]]; then
-  TYPES=("$TARGET_TYPE")
-  VERSIONS=("$TARGET_VERSION")
-elif [[ -n "$TARGET_VERSION" ]]; then
-  TYPES=("${ALL_TYPES[@]}")
-  VERSIONS=("$TARGET_VERSION")
-elif [[ -n "$TARGET_TYPE" ]]; then
-  TYPES=("$TARGET_TYPE")
-  VERSIONS=("${ALL_VERSIONS[@]}")
-else
-  echo "Error: must specify --all or at least one of --type/--version" >&2
-  exit 1
-fi
+    [[ -f "${dir}/.env" && -f "${dir}/Dockerfile" ]] || continue
+    [[ -n "$TARGET_TYPE" && "$type" != "$TARGET_TYPE" ]] && continue
+    [[ -n "$TARGET_VERSION" && "$version" != "$TARGET_VERSION" ]] && continue
 
-# 8) Fail fast if no matching dirs
-found=0
-for v in "${VERSIONS[@]}"; do
-  for t in "${TYPES[@]}"; do
-    [[ -f "$t/$v/.env" ]] && found=1
+    printf '%s %s\n' "$type" "$version"
   done
-done
-if (( found == 0 )); then
-  echo "Error: no matching directories for version(s): ${VERSIONS[*]}" >&2
+}
+
+TARGETS=()
+while IFS= read -r line; do TARGETS+=("$line"); done < <(collect_targets)
+if (( ${#TARGETS[@]} == 0 )); then
+  echo "Error: no matching directories with both .env and Dockerfile" >&2
   exit 1
 fi
 
-# 9) Helper: skip if built <24h ago
 was_recent() {
   local img="$1"
   local created
@@ -97,36 +86,45 @@ was_recent() {
   (( now - csec < 86400 ))
 }
 
-# 10) Build loop
-for v in "${VERSIONS[@]}"; do
-  for t in "${TYPES[@]}"; do
-    DIR="$t/$v"
-    [[ ! -f "$DIR/.env" ]] && continue
+for target in "${TARGETS[@]}"; do
+  read -r t v <<< "$target"
+  DIR="$t/$v"
 
-    # Load build args from .env
-    set -a
-    # shellcheck disable=SC1090
-    source "$DIR/.env"
-    set +a
+  unset IMAGE_REPO LOCAL_IMAGE_REPO IMAGE_TAG IMAGE_TAG_SUFFIX
+  unset IMAGE_COMPAT_REPO LOCAL_IMAGE_COMPAT_REPO IMAGE_COMPAT_TAG LOCAL_IMAGE_COMPAT_TAG
+  set -a
+  # shellcheck disable=SC1090
+  source "$DIR/.env"
+  set +a
 
-    # Tag uses the directory name (v), not PHP_VERSION
-    TAG="mxmd/php:${v}-${t}"
+  TAG_REPO="${IMAGE_REPO:-mxmd/php}"
+  TAG_REF="${IMAGE_TAG:-${v}-${t}${IMAGE_TAG_SUFFIX:-}}"
+  TAG="${TAG_REPO}:${TAG_REF}"
+  TAGS=("$TAG")
+  if [[ -n "${IMAGE_COMPAT_REPO:-}" && -n "${IMAGE_COMPAT_TAG:-}" ]]; then
+    TAGS+=("${IMAGE_COMPAT_REPO}:${IMAGE_COMPAT_TAG}")
+  fi
 
-    # Skip if fresh and not forced
-    if [[ "$FORCE_BUILD" != "true" ]] && was_recent "$TAG"; then
-      echo "Skipping $TAG (built <24h ago)" >&2
-      continue
-    fi
+  if [[ "$FORCE_BUILD" != "true" ]] && was_recent "$TAG"; then
+    echo "Skipping $TAG (built <24h ago)" >&2
+    continue
+  fi
 
-    echo "Building $TAG for $PLATFORMS" >&2
-    docker buildx build \
-      --load \
-      --platform "$PLATFORMS" \
-      --tag "$TAG" \
-      --build-arg PHP_VERSION="$PHP_VERSION" \
-      --build-arg ALPINE_VERSION="$ALPINE_VERSION" \
-      --build-arg ALPINE_IMAGE="alpine:$ALPINE_VERSION" \
-      --file "$DIR/Dockerfile" \
-      "$t/"
+  echo "Building ${TAGS[*]} for $PLATFORMS" >&2
+  BUILD_CMD=(
+    docker buildx build
+    --load
+    --platform "$PLATFORMS"
+  )
+  for tag in "${TAGS[@]}"; do
+    BUILD_CMD+=(--tag "$tag")
   done
+  BUILD_CMD+=(
+    --build-arg PHP_VERSION="$PHP_VERSION"
+    --build-arg ALPINE_VERSION="$ALPINE_VERSION"
+    --build-arg ALPINE_IMAGE="alpine:$ALPINE_VERSION"
+    --file "$DIR/Dockerfile"
+    "$t/"
+  )
+  "${BUILD_CMD[@]}"
 done

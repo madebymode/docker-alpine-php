@@ -1,0 +1,114 @@
+name: Check DHI Base Image Updates
+
+on:
+  schedule:
+    - cron: '0 10 * * *' # Daily at 10:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  check-dhi-digests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.0.0
+
+      - name: Log in to DHI
+        uses: docker/login-action@v4.0.0
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Check digests
+        id: check
+        run: |
+          DIGEST_FILE=".github/dhi-digests.json"
+          [[ -f "$DIGEST_FILE" ]] || echo '{}' > "$DIGEST_FILE"
+
+          CHANGES=""
+
+          for env_file in fpm-hardened/*/.env; do
+            unset PHP_VERSION_MAJOR ALPINE_VERSION
+            set -a; source "$env_file"; set +a
+
+            for variant in dev fpm; do
+              tag="dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-${variant}"
+              key="${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-${variant}"
+
+              echo "Inspecting $tag ..." >&2
+              current=$(docker buildx imagetools inspect "$tag" --format '{{.Manifest.Digest}}' 2>/dev/null)
+
+              if [[ -z "$current" ]]; then
+                echo "WARNING: could not inspect $tag — skipping" >&2
+                continue
+              fi
+
+              stored=$(jq -r --arg k "$key" '.[$k] // ""' "$DIGEST_FILE")
+
+              tmp=$(mktemp)
+              jq --arg k "$key" --arg v "$current" '.[$k] = $v' "$DIGEST_FILE" > "$tmp"
+              mv "$tmp" "$DIGEST_FILE"
+
+              if [[ -z "$stored" ]]; then
+                echo "[bootstrap] $key: $current" >&2
+              elif [[ "$current" != "$stored" ]]; then
+                echo "[changed]   $key: $stored -> $current" >&2
+                CHANGES+="- \`${tag}\`\n  - was: \`${stored}\`\n  - now: \`${current}\`\n"
+              else
+                echo "[ok]        $key: $current" >&2
+              fi
+            done
+          done
+
+          echo "changed=$([[ -n "$CHANGES" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          {
+            echo 'changes<<EOF'
+            printf '%b' "$CHANGES"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Commit updated digest file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/dhi-digests.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update DHI base image digests $(date +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: Open or update GitHub issue
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANGES: ${{ steps.check.outputs.changes }}
+        run: |
+          ISSUE_NUMBER=$(gh issue list --label "dhi-update" --state open --json number --jq '.[0].number // empty')
+
+          BODY=$(cat <<EOF
+          New DHI base image digests detected on $(date -u +%Y-%m-%d).
+
+          ${CHANGES}
+          Trigger a rebuild of the \`fpm-hardened\` images to pull in the updated base.
+          EOF
+          )
+
+          if [[ -n "$ISSUE_NUMBER" ]]; then
+            gh issue comment "$ISSUE_NUMBER" --body "$BODY"
+          else
+            gh issue create \
+              --title "DHI base image update — $(date -u +%Y-%m-%d)" \
+              --label "dhi-update" \
+              --body "$BODY"
+          fi
