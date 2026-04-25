@@ -36,6 +36,29 @@ Available versions of our images along with their Docker Hub links:
 - [8.3-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.3-cli), [8.3-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.3-fpm)
 - [8.4-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.4-cli), [8.4-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.4-fpm)
 
+#### Hardened FPM Images (`fpm-hardened`)
+
+For production workloads where PHP-FPM handles public web traffic, use the hardened variants. Unlike CLI images (which run internal jobs with no public exposure), FPM directly handles inbound HTTP requests — so a reduced attack surface matters.
+
+The hardened images use the [CIS Docker Hardened Image (DHI)](https://dhi.io) FPM runtime:
+
+- **Non-root by default** — runs as DHI's `nonroot` user; if you need host UID/GID mapping, set `user:` explicitly in Compose
+- **Read-only root filesystem** — `read_only: true`; writable scratch space via `tmpfs` at `/tmp` and `/run`
+- **No Composer** — build tooling is excluded from the runtime image
+- **Minimal attack surface** — only runtime artifacts copied from the builder stage; no build-deps remain
+
+```bash
+docker pull mxmd/php:fpm-hardened-8.4
+docker pull mxmd/php:fpm-hardened-8.3
+docker pull mxmd/php:fpm-hardened-8.2
+```
+
+> **Note:** Building locally requires `docker login dhi.io` to pull the DHI base image.
+
+See per-version READMEs for full Compose examples:
+- [fpm-hardened/8.4](fpm-hardened/8.4/README.md)
+- [fpm-hardened/8.3](fpm-hardened/8.3/README.md)
+- [fpm-hardened/8.2](fpm-hardened/8.2/README.md)
 
 #### Usage with Docker Compose
 

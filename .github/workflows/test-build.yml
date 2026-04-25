@@ -1,0 +1,127 @@
+name: Test Builds
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  discover-buildable-images:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork == false
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+
+      - name: Discover buildable image directories
+        id: discover
+        run: |
+          MATRIX=$(
+            find . -path './.git' -prune -o -mindepth 2 -maxdepth 2 -type d -print | sort | while read -r dir; do
+              type="${dir#./}"
+              type="${type%/*}"
+              version="${dir##*/}"
+              if [[ -f "$dir/.env" && -f "$dir/Dockerfile" ]]; then
+                printf '{"type":"%s","version":"%s"}\n' "$type" "$version"
+              fi
+            done | jq -cs .
+          )
+
+          if [[ "$MATRIX" == "[]" ]]; then
+            echo "No buildable image directories found." >&2
+            exit 1
+          fi
+
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: discover-buildable-images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.discover-buildable-images.outputs.matrix) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up environment variables
+        run: |
+          DIR=${{ matrix.type }}/${{ matrix.version }}
+          if [[ ! -f "$DIR/.env" || ! -f "$DIR/Dockerfile" ]]; then
+            echo "Missing .env or Dockerfile in $DIR" >&2
+            exit 1
+          fi
+
+          set -a
+          source "$DIR/.env"
+          set +a
+
+          IMAGE_REPO="${IMAGE_REPO:-mxmd/php}"
+
+          if [[ -n "${IMAGE_TAG:-}" ]]; then
+            BUILD_TAG="${IMAGE_REPO}:${IMAGE_TAG}"
+          else
+            VARIANT=""
+            if [[ "${{ matrix.version }}" == *"-mssql" ]]; then
+              VARIANT="-mssql"
+            fi
+            BUILD_TAG="${IMAGE_REPO}:${PHP_VERSION}${VARIANT}-${{ matrix.type }}"
+          fi
+
+          for VAR_NAME in DIR PLATFORM PHP_VERSION PHP_VERSION_MAJOR ALPINE_VERSION IMAGE_REPO BUILD_TAG; do
+            echo "$VAR_NAME=${!VAR_NAME}" >> "$GITHUB_ENV"
+          done
+
+      - name: Print build info
+        run: |
+          echo "DIR:         $DIR"
+          echo "PHP_VERSION: $PHP_VERSION"
+          echo "ALPINE:      $ALPINE_VERSION"
+          echo "TAG:         $BUILD_TAG"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4.0.0
+        with:
+          image: tonistiigi/binfmt:qemu-v8.1.5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.0.0
+
+      - name: Log in to DHI
+        if: ${{ matrix.type == 'fpm-hardened' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
+        uses: docker/login-action@v4.0.0
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Build (no push)
+        uses: docker/build-push-action@v7.0.0
+        with:
+          context: ./${{ matrix.type }}
+          push: false
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ env.BUILD_TAG }}
+          build-args: |
+            PHP_VERSION=${{ env.PHP_VERSION }}
+            PHP_VERSION_MAJOR=${{ env.PHP_VERSION_MAJOR }}
+            ALPINE_VERSION=${{ env.ALPINE_VERSION }}
+            ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
+          file: ${{ env.DIR }}/Dockerfile
