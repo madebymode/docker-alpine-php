@@ -165,6 +165,8 @@ To build a Docker image for a specific type and version:
 ./local-single-arch.sh --type [TYPE] --version [VERSION]
 ```
 
+These local builds include `provenance=mode=max` to match the release workflow.
+
 For building all available types and versions:
 ```bash
 ./local-single-arch.sh --all
@@ -173,6 +175,7 @@ For building all available types and versions:
 ### 2. Local Docker Buildx Multi-Architecture Build (`buildx-local.sh`):
 
 Buildx is a Docker CLI plugin that offers extended features for building images. It is especially valuable for creating multi-architecture images.
+These local builds include `provenance=mode=max` to match the release workflow.
 
 #### How to Use:
 
@@ -228,5 +231,3 @@ The workflow requires the following secrets:
 - `DOCKER_HUB_USERNAME`: Your Docker Hub username.
 
 - `DOCKER_HUB_ACCESS_TOKEN`: A token or password for Docker Hub to authenticate and push images.
-
-

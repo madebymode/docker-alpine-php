@@ -171,7 +171,7 @@ jobs:
           context: ./${{ matrix.type }}
           push: true
           platforms: linux/amd64,linux/arm64
-          provenance: true
+          provenance: mode=max
           sbom: true
           attests: type=sbom,generator=docker/scout
           tags: ${{ env.PUSH_TAGS }}

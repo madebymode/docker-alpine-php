@@ -142,6 +142,7 @@ for target in "${TARGETS[@]}"; do
 
     docker build --no-cache \
       --tag "${TAG_NAME}" \
+      --provenance="mode=max" \
       --build-arg PHP_VERSION="${PHP_VERSION}" \
       --build-arg ALPINE_VERSION="${ALPINE_VERSION}" \
       --build-arg ALPINE_IMAGE="alpine:${ALPINE_VERSION}" \

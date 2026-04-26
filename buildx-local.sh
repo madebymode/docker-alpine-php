@@ -115,6 +115,7 @@ for target in "${TARGETS[@]}"; do
     docker buildx build
     --load
     --platform "$PLATFORMS"
+    --provenance=mode=max
   )
   for tag in "${TAGS[@]}"; do
     BUILD_CMD+=(--tag "$tag")
