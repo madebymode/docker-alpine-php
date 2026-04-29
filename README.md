@@ -154,9 +154,14 @@ Both local scripts support the following flags:
 
 - `--all`: Commands the script to construct Docker images for all predefined types and versions.
 
+- `--proof-dir [DIR]`: Exports an OCI artifact tarball with `provenance=mode=max` and `sbom=true` into the given directory after the local image build finishes.
+
 ### 1. Local Traditional Build (`local-single-arch.sh`):
 
 This script leverages Docker's standard build process, constructing images specifically for the architecture of the host machine.
+Internally it now uses `docker buildx build --load` with a shared local `docker-container` builder named `local-buildkit`.
+If `DOCKER_HOST` is set, the script creates a dedicated Docker context for that host so Buildx can reuse its TLS configuration for remote daemons.
+If `--proof-dir` is set, the script runs a second Buildx export to write an OCI artifact tarball with attestations to disk.
 
 #### How to Use:
 
@@ -165,7 +170,12 @@ To build a Docker image for a specific type and version:
 ./local-single-arch.sh --type [TYPE] --version [VERSION]
 ```
 
-These local builds include `provenance=mode=max` to match the release workflow.
+To also export local proof artifacts:
+```bash
+./local-single-arch.sh --type [TYPE] --version [VERSION] --proof-dir ./out/proof
+```
+
+`--load` builds do not keep attestations in the local Docker image store, so `--proof-dir` writes them as OCI artifacts on disk instead.
 
 For building all available types and versions:
 ```bash
@@ -175,13 +185,20 @@ For building all available types and versions:
 ### 2. Local Docker Buildx Multi-Architecture Build (`buildx-local.sh`):
 
 Buildx is a Docker CLI plugin that offers extended features for building images. It is especially valuable for creating multi-architecture images.
-These local builds include `provenance=mode=max` to match the release workflow.
+These local builds use `--load`, so they do not attach Buildx provenance attestations; the release workflow still publishes provenance.
+If `DOCKER_HOST` is set by Docker Machine, the script creates a dedicated Docker context for that host so Buildx can reuse its TLS configuration for remote daemons.
+If `--proof-dir` is set, the script runs a second Buildx export to write an OCI artifact tarball with attestations to disk.
 
 #### How to Use:
 
 For a specific type and version:
 ```bash
 ./buildx-local.sh --type [TYPE] --version [VERSION]
+```
+
+To also export local proof artifacts:
+```bash
+./buildx-local.sh --type [TYPE] --version [VERSION] --proof-dir ./out/proof
 ```
 
 For all available types and versions:

@@ -19,6 +19,8 @@
 #   - Composer  (build tool, no place in a production runtime)
 
 ARG ALPINE_VERSION
+ARG RUNTIME_BASE_IMAGE
+ARG RUNTIME_BASE_DIGEST
 
 # ---------------------------------------------------------------------------
 # Stage 1: builder — DHI dev variant
@@ -142,6 +144,12 @@ RUN cd /src && \
 # /usr/local/lib/php/extensions; we copy them to DHI's extension directory.
 # ---------------------------------------------------------------------------
 FROM dhi.io/php:8.2-alpine${ALPINE_VERSION}-fpm
+
+ARG RUNTIME_BASE_IMAGE
+ARG RUNTIME_BASE_DIGEST
+
+LABEL org.opencontainers.image.base.name="${RUNTIME_BASE_IMAGE}" \
+      org.opencontainers.image.base.digest="${RUNTIME_BASE_DIGEST}"
 
 COPY --from=builder $PHP_PREFIX/lib/php/extensions $PHP_PREFIX/lib/php/extensions
 COPY --from=builder /opt/runtime-libs/ /
