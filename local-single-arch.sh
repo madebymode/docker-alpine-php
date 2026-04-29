@@ -5,6 +5,9 @@ TARGET_VERSION=""
 FORCE_BUILD=false
 BUILD_ALL=false
 TARGETPLATFORM=linux/amd64
+BUILDER_NAME="${BUILDER_NAME:-local-buildkit}"
+BUILDER_CONTEXT_NAME="${BUILDER_CONTEXT_NAME:-${BUILDER_NAME}-context}"
+PROOF_DIR=""
 
 # Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
@@ -14,6 +17,7 @@ while [[ "$#" -gt 0 ]]; do
         --force) FORCE_BUILD=true ;;
         --all) BUILD_ALL=true ;;
         --platform) TARGETPLATFORM="$2"; shift ;;
+        --proof-dir) PROOF_DIR="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -48,6 +52,49 @@ cleanup() {
     exit
 }
 
+create_buildx_context() {
+  local docker_opts
+
+  if [[ -z "${DOCKER_HOST:-}" ]]; then
+    docker context show 2>/dev/null || printf 'default\n'
+    return 0
+  fi
+
+  docker_opts="host=${DOCKER_HOST}"
+  if [[ -n "${DOCKER_TLS_VERIFY:-}" && -n "${DOCKER_CERT_PATH:-}" ]]; then
+    docker_opts+=",ca=${DOCKER_CERT_PATH}/ca.pem,cert=${DOCKER_CERT_PATH}/cert.pem,key=${DOCKER_CERT_PATH}/key.pem"
+  fi
+
+  # Persist the current Docker host/TLS settings in a real context so Buildx
+  # does not fall back to plain HTTP when Docker Machine-style env vars are set.
+  docker context rm -f "$BUILDER_CONTEXT_NAME" >/dev/null 2>&1 || true
+  docker context create "$BUILDER_CONTEXT_NAME" --docker "$docker_opts" >/dev/null
+  printf '%s\n' "$BUILDER_CONTEXT_NAME"
+}
+
+setup_buildx_builder() {
+  local endpoint
+
+  endpoint="$(create_buildx_context)"
+
+  if docker buildx inspect "$BUILDER_NAME" >/dev/null 2>&1; then
+    docker buildx use "$BUILDER_NAME" >/dev/null
+    if docker buildx inspect --bootstrap "$BUILDER_NAME" >/dev/null 2>&1; then
+      return 0
+    fi
+
+    docker buildx rm "$BUILDER_NAME" >/dev/null 2>&1 || true
+  fi
+
+  docker buildx create \
+    --name "$BUILDER_NAME" \
+    --driver docker-container \
+    --use \
+    "$endpoint" >/dev/null
+
+  docker buildx inspect --bootstrap "$BUILDER_NAME" >/dev/null
+}
+
 was_created_last_day() {
     local image="$1"
     local timestamp
@@ -78,7 +125,59 @@ collect_targets() {
     done
 }
 
+resolve_manifest_digest() {
+    local ref="$1"
+    local digest
+
+    digest=$(
+        docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' 2>/dev/null | \
+        sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' | head -n 1
+    ) || return 1
+
+    [[ -n "$digest" ]] || return 1
+    printf '%s\n' "$digest"
+}
+
+append_common_build_args() {
+    local -n build_args_ref=$1
+
+    build_args_ref+=(
+      --build-arg PHP_VERSION="${PHP_VERSION}"
+      --build-arg ALPINE_VERSION="${ALPINE_VERSION}"
+      --build-arg ALPINE_IMAGE="alpine:${ALPINE_VERSION}"
+      --build-arg RUNTIME_BASE_IMAGE="${RUNTIME_BASE_IMAGE}"
+      --build-arg RUNTIME_BASE_DIGEST="${RUNTIME_BASE_DIGEST}"
+      --file "${DIR}/Dockerfile"
+      "${TYPE}/"
+    )
+}
+
+export_proof_artifact() {
+    local proof_name proof_path
+    local proof_cmd=(
+      docker buildx build
+      --builder "${BUILDER_NAME}"
+      --platform "${TARGETPLATFORM}"
+      --provenance=mode=max
+      --sbom=true
+      --output
+    )
+
+    mkdir -p "${PROOF_DIR}"
+    proof_name="${TAG_NAME//\//_}"
+    proof_name="${proof_name//:/_}"
+    proof_path="${PROOF_DIR}/${proof_name}.oci.tar"
+
+    proof_cmd+=("type=oci,dest=${proof_path}")
+    append_common_build_args proof_cmd
+
+    echo "Exporting proof artifact: ${proof_path}"
+    "${proof_cmd[@]}"
+}
+
 trap cleanup SIGINT SIGTERM
+
+setup_buildx_builder
 
 TARGETS=()
 while IFS= read -r line; do TARGETS+=("$line"); done < <(collect_targets)
@@ -106,6 +205,17 @@ for target in "${TARGETS[@]}"; do
     TAG_REF="${IMAGE_TAG:-${PHP_VERSION}-${TYPE}${IMAGE_TAG_SUFFIX:-}}"
     TAG_NAME="${TAG_REPO}:${TAG_REF}"
     COMPAT_TAG=""
+    RUNTIME_BASE_IMAGE=""
+    RUNTIME_BASE_DIGEST=""
+
+    if [[ "$TYPE" == "fpm-hardened" ]]; then
+        RUNTIME_BASE_IMAGE="dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-fpm"
+        if ! RUNTIME_BASE_DIGEST="$(resolve_manifest_digest "$RUNTIME_BASE_IMAGE")"; then
+            echo "Warning: could not resolve digest for $RUNTIME_BASE_IMAGE; base name label will still be set."
+            RUNTIME_BASE_DIGEST=""
+        fi
+    fi
+
     if [[ -n "${LOCAL_IMAGE_COMPAT_REPO:-}" && -n "${LOCAL_IMAGE_COMPAT_TAG:-}" ]]; then
         COMPAT_TAG="${LOCAL_IMAGE_COMPAT_REPO}:${LOCAL_IMAGE_COMPAT_TAG}"
     fi
@@ -140,18 +250,25 @@ for target in "${TARGETS[@]}"; do
         fi
     fi
 
-    docker build --no-cache \
-      --tag "${TAG_NAME}" \
-      --provenance="mode=max" \
-      --build-arg PHP_VERSION="${PHP_VERSION}" \
-      --build-arg ALPINE_VERSION="${ALPINE_VERSION}" \
-      --build-arg ALPINE_IMAGE="alpine:${ALPINE_VERSION}" \
-      --build-arg TARGETPLATFORM="${TARGETPLATFORM}" \
-      --file "${DIR}/Dockerfile" \
-      "${TYPE}/"
+    # The local Docker exporter cannot load attested manifest lists back into
+    # the daemon, so keep local `--load` builds single-manifest.
+    BUILD_CMD=(
+      docker buildx build
+      --load
+      --no-cache
+      --builder "${BUILDER_NAME}"
+      --platform "${TARGETPLATFORM}"
+      --tag "${TAG_NAME}"
+    )
+    append_common_build_args BUILD_CMD
+    "${BUILD_CMD[@]}"
 
     if [[ -n "$COMPAT_TAG" ]]; then
         docker tag "${TAG_NAME}" "${COMPAT_TAG}"
+    fi
+
+    if [[ -n "${PROOF_DIR}" ]]; then
+        export_proof_artifact
     fi
 done
 
