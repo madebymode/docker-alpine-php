@@ -112,7 +112,7 @@ RUN cd /src && \
 # ---------------------------------------------------------------------------
 # Stage 3: hardened runtime
 # ---------------------------------------------------------------------------
-FROM dhi.io/php:8.3-alpine${ALPINE_VERSION}-fpm
+FROM ${RUNTIME_BASE_IMAGE}@${RUNTIME_BASE_DIGEST}
 
 ARG RUNTIME_BASE_IMAGE
 ARG RUNTIME_BASE_DIGEST

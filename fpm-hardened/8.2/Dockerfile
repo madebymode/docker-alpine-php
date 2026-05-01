@@ -143,7 +143,7 @@ RUN cd /src && \
 # /opt/php-8.2/etc/php). The dev variant installs extensions to
 # /usr/local/lib/php/extensions; we copy them to DHI's extension directory.
 # ---------------------------------------------------------------------------
-FROM dhi.io/php:8.2-alpine${ALPINE_VERSION}-fpm
+FROM ${RUNTIME_BASE_IMAGE}@${RUNTIME_BASE_DIGEST}
 
 ARG RUNTIME_BASE_IMAGE
 ARG RUNTIME_BASE_DIGEST
