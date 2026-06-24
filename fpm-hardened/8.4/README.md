@@ -30,7 +30,7 @@ Compiled from `$PHP_SRC_DIR` in the builder stage:
 
 | Extension | Source |
 |-----------|--------|
-| bcmath, bz2, exif, gd, mysqli, pdo_mysql, zip | Compiled from PHP source |
+| bcmath, bz2, exif, fileinfo, gd, mysqli, pdo_mysql, zip | Compiled from PHP source |
 | intl, mbstring, opcache, sodium, sockets, xml, dom, curl, openssl | Bundled in DHI runtime |
 
 `pcntl` is intentionally excluded — it exposes fork/exec primitives that are useful for post-exploitation in web-facing containers.

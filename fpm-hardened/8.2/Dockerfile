@@ -46,7 +46,8 @@ RUN apk add --no-cache \
     mariadb-dev \
     oniguruma-dev \
     pax-utils \
-    pcre2-dev
+    pcre2-dev \
+    shared-mime-info
 
 # gd requires explicit configure flags to enable jpeg, freetype, and webp.
 # $PHP_SRC_DIR is provided by the DHI dev image — no source download needed.
@@ -58,7 +59,7 @@ RUN cd $PHP_SRC_DIR/ext/gd && \
 # Remaining bundled extensions need no special configure flags.
 # DHI already ships intl, mbstring, opcache, sodium, sockets, xml — skip them.
 RUN set -e; \
-    for ext in bcmath bz2 exif mysqli pdo_mysql zip; do \
+    for ext in bcmath bz2 exif fileinfo mysqli pdo_mysql zip; do \
         cd $PHP_SRC_DIR/ext/$ext && \
         phpize && ./configure && make -j"$(nproc)" install; \
     done
@@ -92,6 +93,7 @@ RUN mkdir -p /opt/dhi-conf && \
         'extension=bcmath.so' \
         'extension=bz2.so' \
         'extension=exif.so' \
+        'extension=fileinfo.so' \
         'extension=gd.so' \
         'extension=mysqli.so' \
         'extension=pdo_mysql.so' \
@@ -153,6 +155,7 @@ LABEL org.opencontainers.image.base.name="${RUNTIME_BASE_IMAGE}" \
 
 COPY --from=builder $PHP_PREFIX/lib/php/extensions $PHP_PREFIX/lib/php/extensions
 COPY --from=builder /opt/runtime-libs/ /
+COPY --from=builder /usr/share/mime /usr/share/mime
 COPY --from=builder /opt/dhi-conf/zz-extensions.ini  $PHP_PREFIX/etc/php/conf.d/zz-extensions.ini
 COPY --from=builder /opt/dhi-conf/zz-performance.ini $PHP_PREFIX/etc/php/conf.d/zz-performance.ini
 COPY --from=builder /opt/dhi-conf/zz-fpm-pool.conf   $PHP_PREFIX/etc/php-fpm.d/zz-fpm-pool.conf
