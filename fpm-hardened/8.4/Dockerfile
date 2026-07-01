@@ -10,8 +10,7 @@
 # Stage 2 (go-builder): compiles a static FastCGI health probe with no runtime
 #                       dependencies — replaces the PHP CLI in stage 3.
 # Stage 3 (runtime):    dhi.io/php:8.4-fpm — CIS-hardened, non-root,
-#                       read-only rootfs. sh is present; exec in via
-#                       `docker exec -it <container> sh`.
+#                       read-only rootfs with no shell.
 #
 # FPM handles public web traffic, so this image intentionally omits:
 #   - pcntl     (fork/exec primitive, useful for post-exploitation RCE)

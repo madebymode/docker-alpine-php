@@ -91,10 +91,8 @@ jobs:
           BUILDER_BASE_DIGEST=""
           BUILDER_BASE_REF=""
           RUNTIME_BASE_REF=""
-          PHP_PREFIX=""
           if [[ "${{ matrix.type }}" == "fpm-hardened" ]]; then
             DIGEST_FILE=".github/dhi-digests.json"
-            PHP_PREFIX="/opt/php-${PHP_VERSION_MAJOR}"
             BUILDER_BASE_IMAGE="dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-dev"
             RUNTIME_BASE_IMAGE="dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-fpm"
             BUILDER_DIGEST_KEY="${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-dev"
@@ -111,7 +109,7 @@ jobs:
             RUNTIME_BASE_REF="${RUNTIME_BASE_IMAGE}@${RUNTIME_BASE_DIGEST}"
           fi
 
-          for VAR_NAME in DIR PLATFORM PHP_VERSION PHP_VERSION_MAJOR ALPINE_VERSION IMAGE_REPO BUILD_TAG PHP_PREFIX BUILDER_BASE_IMAGE BUILDER_BASE_DIGEST BUILDER_BASE_REF RUNTIME_BASE_IMAGE RUNTIME_BASE_DIGEST RUNTIME_BASE_REF; do
+          for VAR_NAME in DIR PLATFORM PHP_VERSION PHP_VERSION_MAJOR ALPINE_VERSION IMAGE_REPO BUILD_TAG BUILDER_BASE_IMAGE BUILDER_BASE_DIGEST BUILDER_BASE_REF RUNTIME_BASE_IMAGE RUNTIME_BASE_DIGEST RUNTIME_BASE_REF; do
             echo "$VAR_NAME=${!VAR_NAME}" >> "$GITHUB_ENV"
           done
 
@@ -150,7 +148,6 @@ jobs:
             PHP_VERSION_MAJOR=${{ env.PHP_VERSION_MAJOR }}
             ALPINE_VERSION=${{ env.ALPINE_VERSION }}
             ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
-            PHP_PREFIX=${{ env.PHP_PREFIX }}
             BUILDER_BASE_IMAGE=${{ env.BUILDER_BASE_IMAGE }}
             BUILDER_BASE_DIGEST=${{ env.BUILDER_BASE_DIGEST }}
             BUILDER_BASE_REF=${{ env.BUILDER_BASE_REF }}
@@ -158,3 +155,36 @@ jobs:
             RUNTIME_BASE_DIGEST=${{ env.RUNTIME_BASE_DIGEST }}
             RUNTIME_BASE_REF=${{ env.RUNTIME_BASE_REF }}
           file: ${{ env.DIR }}/Dockerfile
+
+      - name: Smoke test hardened PHP extensions
+        if: ${{ matrix.type == 'fpm-hardened' }}
+        run: |
+          set -euo pipefail
+
+          SMOKE_TAG="${BUILD_TAG}-smoke"
+          docker buildx build \
+            --load \
+            --platform linux/amd64 \
+            --tag "$SMOKE_TAG" \
+            --build-arg PHP_VERSION="$PHP_VERSION" \
+            --build-arg PHP_VERSION_MAJOR="$PHP_VERSION_MAJOR" \
+            --build-arg ALPINE_VERSION="$ALPINE_VERSION" \
+            --build-arg ALPINE_IMAGE="alpine:${ALPINE_VERSION}" \
+            --build-arg BUILDER_BASE_IMAGE="$BUILDER_BASE_IMAGE" \
+            --build-arg BUILDER_BASE_DIGEST="$BUILDER_BASE_DIGEST" \
+            --build-arg BUILDER_BASE_REF="$BUILDER_BASE_REF" \
+            --build-arg RUNTIME_BASE_IMAGE="$RUNTIME_BASE_IMAGE" \
+            --build-arg RUNTIME_BASE_DIGEST="$RUNTIME_BASE_DIGEST" \
+            --build-arg RUNTIME_BASE_REF="$RUNTIME_BASE_REF" \
+            --file "$DIR/Dockerfile" \
+            "./${{ matrix.type }}"
+
+          docker run --rm --entrypoint /usr/bin/php "$SMOKE_TAG" -m > /tmp/php-modules.txt
+
+          for ext in bcmath bz2 exif gd mysqli pdo_mysql zip; do
+            if ! grep -Fxq "$ext" /tmp/php-modules.txt; then
+              echo "Missing expected PHP extension: $ext" >&2
+              cat /tmp/php-modules.txt >&2
+              exit 1
+            fi
+          done

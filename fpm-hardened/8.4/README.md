@@ -4,9 +4,9 @@ Three-stage build on top of the [CIS Docker Hardened Image](https://dhi.io) runt
 
 | Stage | Base | Purpose |
 |-------|------|---------|
-| `builder` | `dhi.io/php:8.4-alpine3.22-dev` | Compiles extensions against DHI's exact PHP binary using `$PHP_SRC_DIR` |
+| `builder` | `dhi.io/php:8.4-alpine3.24-dev` | Compiles extensions against DHI's exact PHP binary using `$PHP_SRC_DIR` |
 | `go-builder` | `golang:1.26-alpine3.22` | Builds the static `fcgi-health` probe binary |
-| runtime | `dhi.io/php:8.4-alpine3.22-fpm` | CIS-hardened, non-root, read-only rootfs |
+| runtime | `dhi.io/php:8.4-alpine3.24-fpm` | CIS-hardened, non-root, read-only rootfs |
 
 The `-dev` variant is used as the builder because it shares the exact PHP ABI with the runtime — extensions compiled against the official `php:fpm-alpine` image are ABI-incompatible with DHI (different PCRE2 linking).
 
@@ -54,13 +54,14 @@ FPM pool: `pm=dynamic`, `max_children=20`, `max_requests=500`.
 
 - Runs as `nonroot` (DHI default) — no root user exists in the image
 - `read_only: true` — all writable state goes through bind mounts or tmpfs
-- `$PHP_PREFIX=/opt/php-8.4` — DHI's prefix; all PHP paths live here
+- PHP is configured with prefix `/usr` and config under `/etc/php-8.4`
 - No package manager, no Composer
 
 ## Debugging
 
 ```bash
-docker exec -it <container-name> sh
+docker exec <container-name> /usr/bin/php -m
+docker exec <container-name> /usr/bin/php -i
 ```
 
 ## Adding extensions
@@ -68,17 +69,21 @@ docker exec -it <container-name> sh
 Build against the dev variant in a multi-stage Dockerfile:
 
 ```dockerfile
-FROM dhi.io/php:8.4-alpine3.22-dev AS builder
+FROM dhi.io/php:8.4-alpine3.24-dev AS builder
 RUN pecl install redis
 # OR for bundled extensions:
 RUN cd $PHP_SRC_DIR/ext/intl && phpize && ./configure && make && make install
 
-FROM dhi.io/php:8.4-alpine3.22-fpm
-COPY --from=builder $PHP_PREFIX/lib/php/extensions $PHP_PREFIX/lib/php/extensions
-COPY custom-ext.ini $PHP_PREFIX/etc/php/conf.d/
+RUN extension_dir="$(php-config --extension-dir)" && \
+    mkdir -p /opt/dhi-extensions && \
+    cp -a "$(dirname "$extension_dir")/." /opt/dhi-extensions/
+
+FROM dhi.io/php:8.4-alpine3.24-fpm
+COPY --from=builder /opt/dhi-extensions /usr/lib/php/extensions
+COPY custom-ext.ini /etc/php-8.4/conf.d/
 ```
 
-Note: writing files to `$PHP_PREFIX` in the runtime stage requires `COPY`, not `RUN` — the runtime has no root user in `/etc/passwd`.
+Note: writing files to PHP config or extension paths in the runtime stage requires `COPY`, not `RUN` — the runtime has no root user in `/etc/passwd`.
 
 ## Compose example
 
@@ -95,7 +100,7 @@ services:
       - .:/app
       - ./docker-conf/php-ini:/opt/mode/conf.d
     environment:
-      - PHP_INI_SCAN_DIR=/opt/php-8.4/etc/php/conf.d:/opt/mode/conf.d
+      - PHP_INI_SCAN_DIR=/etc/php-8.4/conf.d:/opt/mode/conf.d
 ```
 
 Mount custom ini files into `/opt/mode/conf.d` — that path is included in `PHP_INI_SCAN_DIR`.
