@@ -4,5 +4,11 @@
   "8.3-alpine3.22-dev": "sha256:6c26f7ae09bc721c93f111e8016f5e7feb795dc7a106f3ac2e005b72cbcc9dcc",
   "8.3-alpine3.22-fpm": "sha256:df92d65593d13edfe5317c044feea57d32dffd32a1aadbd2d7e50698eba09ebd",
   "8.4-alpine3.22-dev": "sha256:4a67e2633dbc70634cb8344624e9c1940a880a055e3db780176eb73a1ba78465",
-  "8.4-alpine3.22-fpm": "sha256:bfdc69272616bef80fa10810f63acfbbb5a0fe9d702ee92550b81dbeb6dee192"
+  "8.4-alpine3.22-fpm": "sha256:bfdc69272616bef80fa10810f63acfbbb5a0fe9d702ee92550b81dbeb6dee192",
+  "8.2-alpine3.24-dev": "sha256:8bada95b470c298309f662a0b3dedd9e06f279f59c81b9edb02f2b8b88c1484e",
+  "8.2-alpine3.24-fpm": "sha256:186a54a87067ccc0854ba6247308da2cab98b4cd3fcf76b7a2a546d32b1c29cd",
+  "8.3-alpine3.24-dev": "sha256:1ed9effc7ce1af23c22f043ee3b11b34759b5a37892df6bc1fd48dee91137e0a",
+  "8.3-alpine3.24-fpm": "sha256:74f4de9e6c9bcface0c562e91e0bb4a1a1b7458547b1e84fc287a3b7dafe21f6",
+  "8.4-alpine3.24-dev": "sha256:3085fc59b96551eb0a62b49f2308f071042cce2e521fd8875c94f398ef4276ad",
+  "8.4-alpine3.24-fpm": "sha256:852e262c16e8aca8bdac9c5e51f7de9a29f4c8e56692b86ac69f7d0cd3d4ef13"
 }
