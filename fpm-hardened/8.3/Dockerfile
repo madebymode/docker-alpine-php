@@ -18,14 +18,20 @@
 #   - PHP CLI   (replaced by a purpose-built static Go binary for healthchecks)
 #   - Composer  (build tool, no place in a production runtime)
 
+ARG PHP_VERSION_MAJOR
 ARG ALPINE_VERSION
-ARG RUNTIME_BASE_IMAGE
+ARG BUILDER_BASE_IMAGE=dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-dev
+ARG BUILDER_BASE_REF=${BUILDER_BASE_IMAGE}
+ARG BUILDER_BASE_DIGEST
+ARG RUNTIME_BASE_IMAGE=dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-fpm
+ARG RUNTIME_BASE_REF=${RUNTIME_BASE_IMAGE}
 ARG RUNTIME_BASE_DIGEST
+ARG PHP_PREFIX=/opt/php-${PHP_VERSION_MAJOR}
 
 # ---------------------------------------------------------------------------
 # Stage 1: builder — DHI dev variant
 # ---------------------------------------------------------------------------
-FROM dhi.io/php:8.3-alpine${ALPINE_VERSION}-dev AS builder
+FROM ${BUILDER_BASE_REF} AS builder
 
 RUN apk add --no-cache \
     bzip2-dev \
@@ -114,10 +120,11 @@ RUN cd /src && \
 # ---------------------------------------------------------------------------
 # Stage 3: hardened runtime
 # ---------------------------------------------------------------------------
-FROM ${RUNTIME_BASE_IMAGE}@${RUNTIME_BASE_DIGEST}
+FROM ${RUNTIME_BASE_REF}
 
 ARG RUNTIME_BASE_IMAGE
 ARG RUNTIME_BASE_DIGEST
+ARG PHP_PREFIX
 
 LABEL org.opencontainers.image.base.name="${RUNTIME_BASE_IMAGE}" \
       org.opencontainers.image.base.digest="${RUNTIME_BASE_DIGEST}"

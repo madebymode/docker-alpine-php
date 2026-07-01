@@ -87,11 +87,31 @@ jobs:
 
           RUNTIME_BASE_IMAGE=""
           RUNTIME_BASE_DIGEST=""
+          BUILDER_BASE_IMAGE=""
+          BUILDER_BASE_DIGEST=""
+          BUILDER_BASE_REF=""
+          RUNTIME_BASE_REF=""
+          PHP_PREFIX=""
           if [[ "${{ matrix.type }}" == "fpm-hardened" ]]; then
+            DIGEST_FILE=".github/dhi-digests.json"
+            PHP_PREFIX="/opt/php-${PHP_VERSION_MAJOR}"
+            BUILDER_BASE_IMAGE="dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-dev"
             RUNTIME_BASE_IMAGE="dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-fpm"
+            BUILDER_DIGEST_KEY="${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-dev"
+            RUNTIME_DIGEST_KEY="${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-fpm"
+            BUILDER_BASE_DIGEST=$(jq -r --arg k "$BUILDER_DIGEST_KEY" '.[$k] // ""' "$DIGEST_FILE")
+            RUNTIME_BASE_DIGEST=$(jq -r --arg k "$RUNTIME_DIGEST_KEY" '.[$k] // ""' "$DIGEST_FILE")
+
+            if [[ -z "$BUILDER_BASE_DIGEST" || -z "$RUNTIME_BASE_DIGEST" ]]; then
+              echo "Missing DHI digest for $BUILDER_DIGEST_KEY or $RUNTIME_DIGEST_KEY in $DIGEST_FILE" >&2
+              exit 1
+            fi
+
+            BUILDER_BASE_REF="${BUILDER_BASE_IMAGE}@${BUILDER_BASE_DIGEST}"
+            RUNTIME_BASE_REF="${RUNTIME_BASE_IMAGE}@${RUNTIME_BASE_DIGEST}"
           fi
 
-          for VAR_NAME in DIR PLATFORM PHP_VERSION PHP_VERSION_MAJOR ALPINE_VERSION IMAGE_REPO BUILD_TAG RUNTIME_BASE_IMAGE RUNTIME_BASE_DIGEST; do
+          for VAR_NAME in DIR PLATFORM PHP_VERSION PHP_VERSION_MAJOR ALPINE_VERSION IMAGE_REPO BUILD_TAG PHP_PREFIX BUILDER_BASE_IMAGE BUILDER_BASE_DIGEST BUILDER_BASE_REF RUNTIME_BASE_IMAGE RUNTIME_BASE_DIGEST RUNTIME_BASE_REF; do
             echo "$VAR_NAME=${!VAR_NAME}" >> "$GITHUB_ENV"
           done
 
@@ -118,16 +138,6 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      - name: Resolve hardened runtime base digest
-        if: ${{ matrix.type == 'fpm-hardened' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
-        run: |
-          DIGEST=$(docker buildx imagetools inspect "$RUNTIME_BASE_IMAGE" --format '{{json .Manifest}}' | jq -r '.digest // empty')
-          if [[ -z "$DIGEST" ]]; then
-            echo "Failed to resolve digest for $RUNTIME_BASE_IMAGE" >&2
-            exit 1
-          fi
-          echo "RUNTIME_BASE_DIGEST=$DIGEST" >> "$GITHUB_ENV"
-
       - name: Build (no push)
         uses: docker/build-push-action@v7.0.0
         with:
@@ -140,6 +150,11 @@ jobs:
             PHP_VERSION_MAJOR=${{ env.PHP_VERSION_MAJOR }}
             ALPINE_VERSION=${{ env.ALPINE_VERSION }}
             ALPINE_IMAGE=alpine:${{ env.ALPINE_VERSION }}
+            PHP_PREFIX=${{ env.PHP_PREFIX }}
+            BUILDER_BASE_IMAGE=${{ env.BUILDER_BASE_IMAGE }}
+            BUILDER_BASE_DIGEST=${{ env.BUILDER_BASE_DIGEST }}
+            BUILDER_BASE_REF=${{ env.BUILDER_BASE_REF }}
             RUNTIME_BASE_IMAGE=${{ env.RUNTIME_BASE_IMAGE }}
             RUNTIME_BASE_DIGEST=${{ env.RUNTIME_BASE_DIGEST }}
+            RUNTIME_BASE_REF=${{ env.RUNTIME_BASE_REF }}
           file: ${{ env.DIR }}/Dockerfile

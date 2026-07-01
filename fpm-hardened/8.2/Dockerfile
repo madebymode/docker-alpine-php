@@ -18,9 +18,15 @@
 #   - PHP CLI   (replaced by a purpose-built static Go binary for healthchecks)
 #   - Composer  (build tool, no place in a production runtime)
 
+ARG PHP_VERSION_MAJOR
 ARG ALPINE_VERSION
-ARG RUNTIME_BASE_IMAGE
+ARG BUILDER_BASE_IMAGE=dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-dev
+ARG BUILDER_BASE_REF=${BUILDER_BASE_IMAGE}
+ARG BUILDER_BASE_DIGEST
+ARG RUNTIME_BASE_IMAGE=dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-fpm
+ARG RUNTIME_BASE_REF=${RUNTIME_BASE_IMAGE}
 ARG RUNTIME_BASE_DIGEST
+ARG PHP_PREFIX=/opt/php-${PHP_VERSION_MAJOR}
 
 # ---------------------------------------------------------------------------
 # Stage 1: builder — DHI dev variant
@@ -29,7 +35,7 @@ ARG RUNTIME_BASE_DIGEST
 # be installed explicitly to provide pcre2.h for extensions that include
 # php_pcre.h (zip, xml, etc.).
 # ---------------------------------------------------------------------------
-FROM dhi.io/php:8.2-alpine${ALPINE_VERSION}-dev AS builder
+FROM ${BUILDER_BASE_REF} AS builder
 
 # Dev headers for each extension we compile, plus the system PCRE2 headers
 # required by DHI's PHP build. Runtime shared libs (libwebp, freetype, etc.)
@@ -145,10 +151,11 @@ RUN cd /src && \
 # /opt/php-8.2/etc/php). The dev variant installs extensions to
 # /usr/local/lib/php/extensions; we copy them to DHI's extension directory.
 # ---------------------------------------------------------------------------
-FROM ${RUNTIME_BASE_IMAGE}@${RUNTIME_BASE_DIGEST}
+FROM ${RUNTIME_BASE_REF}
 
 ARG RUNTIME_BASE_IMAGE
 ARG RUNTIME_BASE_DIGEST
+ARG PHP_PREFIX
 
 LABEL org.opencontainers.image.base.name="${RUNTIME_BASE_IMAGE}" \
       org.opencontainers.image.base.digest="${RUNTIME_BASE_DIGEST}"
