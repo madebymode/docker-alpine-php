@@ -33,6 +33,8 @@ Compiled from `$PHP_SRC_DIR` in the builder stage:
 | bcmath, bz2, exif, fileinfo, gd, mysqli, pdo_mysql, zip | Compiled from PHP source |
 | intl, mbstring, opcache, sodium, sockets, xml, dom, curl, openssl | Bundled in DHI runtime |
 
+The shared MIME database from Alpine's `shared-mime-info` package is copied into the runtime image at `/usr/share/mime` for MIME detection parity with the standard 8.x images.
+
 `pcntl` is intentionally excluded — it exposes fork/exec primitives that are useful for post-exploitation in web-facing containers.
 
 ## Performance settings (baked in)
