@@ -18,7 +18,7 @@
 #   - PHP CLI   (replaced by a purpose-built static Go binary for healthchecks)
 #   - Composer  (build tool, no place in a production runtime)
 
-ARG PHP_VERSION_MAJOR
+ARG PHP_VERSION_MAJOR=8.4
 ARG ALPINE_VERSION
 ARG BUILDER_BASE_IMAGE=dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-dev
 ARG BUILDER_BASE_REF=${BUILDER_BASE_IMAGE}
@@ -26,7 +26,6 @@ ARG BUILDER_BASE_DIGEST
 ARG RUNTIME_BASE_IMAGE=dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-fpm
 ARG RUNTIME_BASE_REF=${RUNTIME_BASE_IMAGE}
 ARG RUNTIME_BASE_DIGEST
-ARG PHP_PREFIX=/opt/php-${PHP_VERSION_MAJOR}
 
 # ---------------------------------------------------------------------------
 # Stage 1: builder — DHI dev variant
@@ -54,13 +53,17 @@ RUN cd $PHP_SRC_DIR/ext/gd && \
     make -j"$(nproc)" install
 
 RUN set -e; \
-    for ext in bcmath bz2 exif fileinfo mysqli pdo_mysql zip; do \
+    for ext in bcmath bz2 exif mysqli pdo_mysql zip; do \
         cd $PHP_SRC_DIR/ext/$ext && \
         phpize && ./configure && make -j"$(nproc)" install; \
     done
 
+RUN extension_dir="$(php-config --extension-dir)" && \
+    mkdir -p /opt/dhi-extensions && \
+    cp -a "$(dirname "$extension_dir")/." /opt/dhi-extensions/
+
 RUN mkdir -p /opt/runtime-libs && \
-    find $PHP_PREFIX/lib/php/extensions -name '*.so' \
+    find /opt/dhi-extensions -name '*.so' \
         -exec scanelf --needed --nobanner --format '%n\n' '{}' ';' | \
     tr ',' '\n' | grep -v '^$' | sort -u > /tmp/dep-names.txt; \
     while read -r lib; do \
@@ -80,7 +83,6 @@ RUN mkdir -p /opt/dhi-conf && \
         'extension=bcmath.so' \
         'extension=bz2.so' \
         'extension=exif.so' \
-        'extension=fileinfo.so' \
         'extension=gd.so' \
         'extension=mysqli.so' \
         'extension=pdo_mysql.so' \
@@ -112,9 +114,8 @@ RUN mkdir -p /opt/dhi-conf && \
 # ---------------------------------------------------------------------------
 FROM golang:1.26-alpine3.22 AS go-builder
 
-COPY _shared/fcgi-health.go /src/
+COPY _shared/go.mod _shared/fcgi-health.go /src/
 RUN cd /src && \
-    go mod init fcgi-health && \
     CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /fcgi-health .
 
 # ---------------------------------------------------------------------------
@@ -124,24 +125,24 @@ FROM ${RUNTIME_BASE_REF}
 
 ARG RUNTIME_BASE_IMAGE
 ARG RUNTIME_BASE_DIGEST
-ARG PHP_PREFIX
+ARG PHP_VERSION_MAJOR
 
 LABEL org.opencontainers.image.base.name="${RUNTIME_BASE_IMAGE}" \
       org.opencontainers.image.base.digest="${RUNTIME_BASE_DIGEST}"
 
-COPY --from=builder $PHP_PREFIX/lib/php/extensions $PHP_PREFIX/lib/php/extensions
+COPY --from=builder /opt/dhi-extensions /usr/lib/php/extensions
 COPY --from=builder /opt/runtime-libs/ /
 COPY --from=builder /usr/share/mime /usr/share/mime
-COPY --from=builder /opt/dhi-conf/zz-extensions.ini  $PHP_PREFIX/etc/php/conf.d/zz-extensions.ini
-COPY --from=builder /opt/dhi-conf/zz-performance.ini $PHP_PREFIX/etc/php/conf.d/zz-performance.ini
-COPY --from=builder /opt/dhi-conf/zz-fpm-pool.conf   $PHP_PREFIX/etc/php-fpm.d/zz-fpm-pool.conf
+COPY --from=builder /opt/dhi-conf/zz-extensions.ini  /etc/php-${PHP_VERSION_MAJOR}/conf.d/zz-extensions.ini
+COPY --from=builder /opt/dhi-conf/zz-performance.ini /etc/php-${PHP_VERSION_MAJOR}/conf.d/zz-performance.ini
+COPY --from=builder /opt/dhi-conf/zz-fpm-pool.conf   /etc/php-${PHP_VERSION_MAJOR}/php-fpm.d/zz-fpm-pool.conf
 
 COPY --from=go-builder /fcgi-health /usr/local/bin/fcgi-health
 
 ENV HOME="/tmp" \
     XDG_CACHE_HOME="/tmp/.cache" \
     PATH="/app/vendor/bin:${PATH}" \
-    PHP_INI_SCAN_DIR="$PHP_PREFIX/etc/php/conf.d:/opt/mode/conf.d"
+    PHP_INI_SCAN_DIR="/etc/php-${PHP_VERSION_MAJOR}/conf.d:/opt/mode/conf.d"
 
 WORKDIR /app
 EXPOSE 9000

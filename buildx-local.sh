@@ -118,8 +118,7 @@ resolve_manifest_digest() {
   local digest
 
   digest=$(
-    docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' 2>/dev/null | \
-      sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' | head -n 1
+    docker buildx imagetools inspect "$ref" --format '{{.Manifest.Digest}}' 2>/dev/null
   ) || return 1
 
   [[ -n "$digest" ]] || return 1
@@ -127,9 +126,11 @@ resolve_manifest_digest() {
 }
 
 append_common_build_args() {
-  local -n build_args_ref=$1
+  local build_args_name=$1
+  local php_version_major="${PHP_VERSION_MAJOR:-}"
+  local common_args
 
-  build_args_ref+=(
+  common_args=(
     --build-arg PHP_VERSION="$PHP_VERSION"
     --build-arg ALPINE_VERSION="$ALPINE_VERSION"
     --build-arg ALPINE_IMAGE="alpine:$ALPINE_VERSION"
@@ -138,6 +139,12 @@ append_common_build_args() {
     --file "$DIR/Dockerfile"
     "$t/"
   )
+
+  if [[ -n "$php_version_major" ]]; then
+    common_args+=(--build-arg PHP_VERSION_MAJOR="$php_version_major")
+  fi
+
+  eval "$build_args_name"'+=("${common_args[@]}")'
 }
 
 export_proof_artifact() {
