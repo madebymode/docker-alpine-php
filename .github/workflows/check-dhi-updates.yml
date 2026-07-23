@@ -113,7 +113,7 @@ jobs:
           if [[ -n "$ISSUE_NUMBER" ]]; then
             gh issue comment "$ISSUE_NUMBER" --body "$BODY"
           else
-            gh issue create \
+            gh issue create --force \
               --title "DHI base image update — $(date -u +%Y-%m-%d)" \
               --label "dhi-update" \
               --body "$BODY"
