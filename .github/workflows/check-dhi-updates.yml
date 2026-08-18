@@ -96,6 +96,7 @@ jobs:
         run: |
           if ! gh label view "dhi-update" >/dev/null 2>&1; then
             gh label create "dhi-update" \
+              --force \
               --color "0e8a16" \
               --description "Tracks Docker Hardened Images base digest updates"
           fi
