@@ -5,7 +5,7 @@ Three-stage build on top of the [CIS Docker Hardened Image](https://dhi.io) runt
 | Stage | Base | Purpose |
 |-------|------|---------|
 | `builder` | `dhi.io/php:8.2-alpine3.24-dev` | Compiles extensions against DHI's exact PHP binary using `$PHP_SRC_DIR` |
-| `go-builder` | `golang:1.26-alpine3.22` | Builds the static `fcgi-health` probe binary |
+| `go-builder` | `golang:1.26.7-alpine3.24` | Builds the static `fcgi-health` probe binary |
 | runtime | `dhi.io/php:8.2-alpine3.24-fpm` | CIS-hardened, non-root, read-only rootfs |
 
 The `-dev` variant is used as the builder because it shares the exact PHP ABI with the runtime — extensions compiled against the official `php:fpm-alpine` image are ABI-incompatible with DHI (different PCRE2 linking).

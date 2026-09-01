@@ -111,7 +111,7 @@ RUN mkdir -p /opt/dhi-conf && \
 # ---------------------------------------------------------------------------
 # Stage 2: go-builder
 # ---------------------------------------------------------------------------
-FROM golang:1.26-alpine3.22 AS go-builder
+FROM golang:1.26.7-alpine3.24 AS go-builder
 
 COPY _shared/go.mod _shared/fcgi-health.go /src/
 RUN cd /src && \
