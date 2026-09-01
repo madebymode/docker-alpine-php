@@ -1,6 +1,6 @@
 # ─── args & base image ────────────────────────────────────────────────────────
 ARG PHP_VERSION=${PHP_VERSION}
-ARG ALPINE_VERSION=${ALPINE_VERSION}   # e.g. "3.21"
+ARG ALPINE_VERSION=${ALPINE_VERSION}   # e.g. "3.24"
 FROM --platform=$TARGETPLATFORM php:${PHP_VERSION}-cli-alpine${ALPINE_VERSION}
 
 ARG TARGETARCH
@@ -80,14 +80,13 @@ RUN if [ -z "$TARGETARCH" ]; then \
     fi && \
     echo "Building for $TARGETARCH"
 
-# ─── Microsoft SQL Server (multi-arch, Alpine 3.21 w/ sig verification) ─────────
+# ─── Microsoft SQL Server (multi-arch, Alpine w/ sig verification) ─────────────
 ENV ACCEPT_EULA=Y
 
 ARG TARGETARCH
-ARG ODBC_VERSION=18.5.1.1-1
-ARG ODBC_GUID=fae28b9a-d880-42fd-9b98-d779f0fdd77f
-ARG TOOLS_VERSION=18.4.1.1-1
-ARG TOOLS_PATH=7/6/d/76de322a-d860-4894-9945-f0cc5d6a45f8
+ARG MSSQL_VERSION=18.6.2.1-1
+ARG ODBC_GUID=0b3d5518-b4a7-4a2b-afc7-7ee9e967f93c
+ARG TOOLS_GUID=cad0d30f-b9b1-4765-a011-81d8a66c8b8d
 
 RUN set -eux; \
     # 1) install runtime + dev deps for ODBC & GPG
@@ -106,18 +105,18 @@ RUN set -eux; \
     esac; \
     \
     # 3) name pkgs & sigs
-    ODBC_PKG="msodbcsql18_${ODBC_VERSION}_${arch}.apk"; \
-    ODBC_SIG="msodbcsql18_${ODBC_VERSION}_${arch}.sig"; \
-    TOOLS_PKG="mssql-tools18_${TOOLS_VERSION}_${arch}.apk"; \
-    TOOLS_SIG="mssql-tools18_${TOOLS_VERSION}_${arch}.sig"; \
+    ODBC_PKG="msodbcsql18_${MSSQL_VERSION}_${arch}.apk"; \
+    ODBC_SIG="msodbcsql18_${MSSQL_VERSION}_${arch}.sig"; \
+    TOOLS_PKG="mssql-tools18_${MSSQL_VERSION}_${arch}.apk"; \
+    TOOLS_SIG="mssql-tools18_${MSSQL_VERSION}_${arch}.sig"; \
     \
-    # 4) download from MS CDN :contentReference[oaicite:0]{index=0}
+    # 4) download driver & tools + sigs
     curl -fsSL -O "https://download.microsoft.com/download/${ODBC_GUID}/${ODBC_PKG}" \
                  -O "https://download.microsoft.com/download/${ODBC_GUID}/${ODBC_SIG}" \
-                 -O "https://download.microsoft.com/download/${TOOLS_PATH}/${TOOLS_PKG}" \
-                 -O "https://download.microsoft.com/download/${TOOLS_PATH}/${TOOLS_SIG}"; \
+                 -O "https://download.microsoft.com/download/${TOOLS_GUID}/${TOOLS_PKG}" \
+                 -O "https://download.microsoft.com/download/${TOOLS_GUID}/${TOOLS_SIG}"; \
     \
-    # 5) import MS key & verify :contentReference[oaicite:1]{index=1}
+    # 5) import MS key & verify
     curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --import -; \
     gpg --verify "${ODBC_SIG}" "${ODBC_PKG}"; \
     gpg --verify "${TOOLS_SIG}" "${TOOLS_PKG}"; \
