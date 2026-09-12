@@ -1,0 +1,80 @@
+name: Scan Docker Images for Fixes
+
+on:
+  schedule:
+    - cron: '0 11 * * *' # Daily after the PHP version and DHI digest checks
+  workflow_dispatch:
+    inputs:
+      image_type:
+        description: Images to scan
+        type: choice
+        default: all
+        options:
+          - all
+          - cli
+          - fpm
+          - fpm-hardened
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: scout-rebuilds-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      has_fixes: ${{ steps.scan.outputs.has_fixes }}
+      matrix: ${{ steps.scan.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.0.0
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4.0.0
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Install Docker Scout
+        run: |
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/docker/scout-cli/v1.20.3/install.sh \
+            --output "$RUNNER_TEMP/install-scout.sh"
+          sh "$RUNNER_TEMP/install-scout.sh" -b "$HOME/.docker/cli-plugins" v1.20.3
+
+      - name: Scan published images for fixable CVEs
+        id: scan
+        env:
+          IMAGE_TYPE: ${{ inputs.image_type || 'all' }}
+        run: python3 .github/scripts/scan_docker_images.py --image-type "$IMAGE_TYPE"
+
+      - name: Save Scout reports
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: scout-reports
+          path: scout-reports/
+          retention-days: 30
+          if-no-files-found: warn
+
+  rebuild:
+    needs: scan
+    if: needs.scan.outputs.has_fixes == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      image_matrix: ${{ needs.scan.outputs.matrix }}
+      ref: ${{ github.sha }}
+      fresh_build: true
+    secrets: inherit
