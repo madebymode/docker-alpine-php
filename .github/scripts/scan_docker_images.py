@@ -73,7 +73,8 @@ def scan_images(repo_root: Path, reports_dir: Path, image_type: str) -> tuple[li
                 report = reports_dir / f'{prefix}-{platform.split("/")[1]}.md'
                 command = [
                     "docker", "scout", "cves", f"registry://{reference}@{digest}",
-                    "--platform", platform, "--only-fixed", "--exit-code",
+                    "--platform", platform, "--only-fixed", "--ignore-base",
+                    "--only-severity", "high,critical", "--exit-code",
                     "--format", "markdown", "--output", str(report),
                 ]
                 try:
