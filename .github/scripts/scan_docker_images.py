@@ -28,10 +28,17 @@ def image_reference(env_file: Path) -> str:
     return f"{repository}:{tag}"
 
 
-def scan_images(repo_root: Path, reports_dir: Path, image_type: str) -> tuple[list[dict[str, str]], list[str]]:
+def extract_cve_ids(report: Path) -> set[str]:
+    if not report.is_file():
+        return set()
+    return set(re.findall(r'\bCVE-\d{4}-\d{4,}\b', report.read_text()))
+
+
+def scan_images(repo_root: Path, reports_dir: Path, image_type: str) -> tuple[list[dict[str, str]], list[str], set[str]]:
     reports_dir.mkdir(parents=True, exist_ok=True)
     matrix: list[dict[str, str]] = []
     errors: list[str] = []
+    cve_ids: set[str] = set()
     summary = ["| Image | Platform | Result |", "| --- | --- | --- |"]
     scanned = 0
 
@@ -77,6 +84,7 @@ def scan_images(repo_root: Path, reports_dir: Path, image_type: str) -> tuple[li
                     elif result.returncode == 2:
                         status = "Fixes available; rebuild requested"
                         fixable = True
+                        cve_ids.update(extract_cve_ids(report))
                     else:
                         status = f"Scan failed (exit {result.returncode})"
                         errors.append(f"{reference} ({platform}): {status}; see {report.with_suffix('.log').name}")
@@ -97,7 +105,7 @@ def scan_images(repo_root: Path, reports_dir: Path, image_type: str) -> tuple[li
     if summary_file := os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(summary_file, "a") as output:
             output.write(summary_text)
-    return matrix, errors
+    return matrix, errors, cve_ids
 
 
 def main() -> int:
@@ -105,17 +113,21 @@ def main() -> int:
     parser.add_argument("--image-type", choices=("all", *IMAGE_TYPES), default="all")
     parser.add_argument("--reports-dir", type=Path, default=Path("scout-reports"))
     args = parser.parse_args()
-    matrix, errors = scan_images(REPO_ROOT, args.reports_dir, args.image_type)
+    matrix, errors, cve_ids = scan_images(REPO_ROOT, args.reports_dir, args.image_type)
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
     encoded = json.dumps(matrix, separators=(",", ":"))
+    cve_list = ",".join(sorted(cve_ids))
     if output_file := os.environ.get("GITHUB_OUTPUT"):
         with open(output_file, "a") as output:
             output.write(f"matrix={encoded}\n")
             output.write(f"has_fixes={str(bool(matrix)).lower()}\n")
+            output.write(f"cve_list={cve_list}\n")
     print(f"Rebuild matrix: {encoded}")
+    if cve_list:
+        print(f"CVEs with fixes: {cve_list}")
     return 0
 
 

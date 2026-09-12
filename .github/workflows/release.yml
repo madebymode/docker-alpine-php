@@ -23,6 +23,10 @@ on:
         description: Commit to check out and build
         type: string
         default: ''
+      cve_list:
+        description: Comma-separated CVE IDs patched in this build (appended to release notes)
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -168,13 +172,24 @@ jobs:
             echo 'EOF'
           } >> "$GITHUB_ENV"
 
-      - name: Create Release
+      - name: Create or update release
         run: |
+          CVE_LIST="${{ inputs.cve_list }}"
+
           if ! gh release view "$IMAGE_TAG_PREFIX" > /dev/null 2>&1; then
             gh release create "$IMAGE_TAG_PREFIX" \
               --target "$SOURCE_SHA" \
               --title "$RELEASE_TITLE" \
               --notes "Docker image for ${IMAGE_REPO}:${IMAGE_TAG}. [View on Docker Hub](${DOCKER_HUB_LINK})"
+          fi
+
+          if [[ -n "$CVE_LIST" ]]; then
+            PATCH_DATE=$(date +%Y-%m-%d)
+            CURRENT_NOTES=$(gh release view "$IMAGE_TAG_PREFIX" --json body -q .body 2>/dev/null || echo "")
+            CVE_FORMATTED=$(echo "$CVE_LIST" | sed 's/,/`, `/g')
+            PATCH_NOTE="**CVE Patch (${PATCH_DATE}):** Rebuilt to patch fixable CVEs detected by Docker Scout: \`${CVE_FORMATTED}\`"
+            UPDATED_NOTES="${CURRENT_NOTES}"$'\n\n'"${PATCH_NOTE}"
+            gh release edit "$IMAGE_TAG_PREFIX" --notes "$UPDATED_NOTES"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

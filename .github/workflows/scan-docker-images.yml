@@ -32,6 +32,7 @@ jobs:
     outputs:
       has_fixes: ${{ steps.scan.outputs.has_fixes }}
       matrix: ${{ steps.scan.outputs.matrix }}
+      cve_list: ${{ steps.scan.outputs.cve_list }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6.0.2
@@ -77,4 +78,5 @@ jobs:
       image_matrix: ${{ needs.scan.outputs.matrix }}
       ref: ${{ github.sha }}
       fresh_build: true
+      cve_list: ${{ needs.scan.outputs.cve_list }}
     secrets: inherit
