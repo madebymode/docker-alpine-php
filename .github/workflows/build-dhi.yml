@@ -1,0 +1,21 @@
+name: Build DHI Images
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit containing the updated DHI base image digests
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-dhi:
+    uses: ./.github/workflows/release.yml
+    with:
+      image_type: fpm-hardened
+      ref: ${{ inputs.ref || github.sha }}
+    secrets: inherit

@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  issues: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -15,6 +14,9 @@ env:
 jobs:
   check-dhi-digests:
     runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+      ref: ${{ steps.commit.outputs.ref }}
 
     steps:
       - name: Checkout repository
@@ -31,12 +33,9 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
       - name: Check digests
-        id: check
         run: |
           DIGEST_FILE=".github/dhi-digests.json"
           [[ -f "$DIGEST_FILE" ]] || echo '{}' > "$DIGEST_FILE"
-
-          CHANGES=""
 
           for env_file in fpm-hardened/*/.env; do
             unset PHP_VERSION_MAJOR ALPINE_VERSION
@@ -64,21 +63,14 @@ jobs:
                 echo "[bootstrap] $key: $current" >&2
               elif [[ "$current" != "$stored" ]]; then
                 echo "[changed]   $key: $stored -> $current" >&2
-                CHANGES+="- \`${tag}\`\n  - was: \`${stored}\`\n  - now: \`${current}\`\n"
               else
                 echo "[ok]        $key: $current" >&2
               fi
             done
           done
 
-          echo "changed=$([[ -n "$CHANGES" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          {
-            echo 'changes<<EOF'
-            printf '%b' "$CHANGES"
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
-
       - name: Commit updated digest file
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -86,36 +78,16 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "chore: update DHI base image digests $(date +%Y-%m-%d)"
             git push
-          fi
-
-      - name: Open or update GitHub issue
-        if: steps.check.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CHANGES: ${{ steps.check.outputs.changes }}
-        run: |
-          if ! gh label view "dhi-update" >/dev/null 2>&1; then
-            gh label create "dhi-update" \
-              --force \
-              --color "0e8a16" \
-              --description "Tracks Docker Hardened Images base digest updates"
-          fi
-
-          ISSUE_NUMBER=$(gh issue list --label "dhi-update" --state open --json number --jq '.[0].number // empty')
-
-          BODY=$(cat <<EOF
-          New DHI base image digests detected on $(date -u +%Y-%m-%d).
-
-          ${CHANGES}
-          Trigger a rebuild of the \`fpm-hardened\` images to pull in the updated base.
-          EOF
-          )
-
-          if [[ -n "$ISSUE_NUMBER" ]]; then
-            gh issue comment "$ISSUE_NUMBER" --body "$BODY"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           else
-            gh issue create --force \
-              --title "DHI base image update — $(date -u +%Y-%m-%d)" \
-              --label "dhi-update" \
-              --body "$BODY"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
+          echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build-dhi:
+    needs: check-dhi-digests
+    if: needs.check-dhi-digests.outputs.changed == 'true'
+    uses: ./.github/workflows/build-dhi.yml
+    with:
+      ref: ${{ needs.check-dhi-digests.outputs.ref }}
+    secrets: inherit

@@ -5,6 +5,20 @@ on:
     branches:
       - master
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      image_type:
+        description: Image directory type to build; empty builds all types
+        type: string
+        default: ''
+      image_matrix:
+        description: JSON array of image type/version pairs to build; empty discovers all matching images
+        type: string
+        default: ''
+      ref:
+        description: Commit to check out and build
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -20,20 +34,40 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Discover buildable image directories
         id: discover
+        env:
+          IMAGE_TYPE_FILTER: ${{ inputs.image_type }}
+          REQUESTED_MATRIX: ${{ inputs.image_matrix }}
         run: |
           MATRIX=$(
             find . -path './.git' -prune -o -mindepth 2 -maxdepth 2 -type d -print | sort | while read -r dir; do
               type="${dir#./}"
               type="${type%/*}"
               version="${dir##*/}"
+              if [[ -n "$IMAGE_TYPE_FILTER" && "$type" != "$IMAGE_TYPE_FILTER" ]]; then
+                continue
+              fi
               if [[ -f "$dir/.env" && -f "$dir/Dockerfile" ]]; then
                 printf '{"type":"%s","version":"%s"}\n' "$type" "$version"
               fi
             done | jq -cs .
           )
+
+          if [[ -n "$REQUESTED_MATRIX" ]]; then
+            MATRIX=$(jq -ce --argjson available "$MATRIX" '
+              if type != "array" then
+                error("Image matrix must be an array")
+              elif any(.[]; . as $image | $available | index($image) | . == null) then
+                error("Image matrix contains an image outside the discovered buildable directories")
+              else
+                unique
+              end
+            ' <<< "$REQUESTED_MATRIX")
+          fi
 
           if [[ "$MATRIX" == "[]" ]]; then
             echo "No buildable image directories found." >&2
@@ -52,6 +86,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Record source commit
+        run: echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Setup GitHub CLI
         run: |
@@ -129,6 +168,7 @@ jobs:
         run: |
           if ! gh release view "$IMAGE_TAG_PREFIX" > /dev/null 2>&1; then
             gh release create "$IMAGE_TAG_PREFIX" \
+              --target "$SOURCE_SHA" \
               --title "$RELEASE_TITLE" \
               --notes "Docker image for ${IMAGE_REPO}:${IMAGE_TAG}. [View on Docker Hub](${DOCKER_HUB_LINK})"
           fi
@@ -258,7 +298,7 @@ jobs:
 
           if ! gh release view "${DIGEST_TAG}" > /dev/null 2>&1; then
             gh release create "${DIGEST_TAG}" \
-              --target "${GITHUB_SHA}" \
+              --target "$SOURCE_SHA" \
               --title "Docker digest ${DIGEST_TAG}" \
               --notes "${RELEASE_NOTES}"
           fi

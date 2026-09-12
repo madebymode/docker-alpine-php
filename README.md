@@ -1,4 +1,4 @@
-# cross platform alpine-based php 7.1 - 8.4 images
+# cross platform alpine-based php 7.1 - 8.5 images
 
 ## Container Runtimes
 
@@ -48,6 +48,7 @@ The hardened images use the [CIS Docker Hardened Image (DHI)](https://dhi.io) FP
 - **Minimal attack surface** — only runtime artifacts copied from the builder stage; no build-deps remain
 
 ```bash
+docker pull mxmd/php:fpm-hardened-8.5
 docker pull mxmd/php:fpm-hardened-8.4
 docker pull mxmd/php:fpm-hardened-8.3
 docker pull mxmd/php:fpm-hardened-8.2
@@ -56,6 +57,7 @@ docker pull mxmd/php:fpm-hardened-8.2
 > **Note:** Building locally requires `docker login dhi.io` to pull the DHI base image.
 
 See per-version READMEs for full Compose examples:
+- [fpm-hardened/8.5](fpm-hardened/8.5/README.md)
 - [fpm-hardened/8.4](fpm-hardened/8.4/README.md)
 - [fpm-hardened/8.3](fpm-hardened/8.3/README.md)
 - [fpm-hardened/8.2](fpm-hardened/8.2/README.md)
@@ -208,6 +210,26 @@ For all available types and versions:
 
 
 ## 3. GitHub Actions
+
+### Automated DHI Builds
+
+Run **Build DHI Images** manually from the Actions tab to build and publish only
+the `fpm-hardened` images using the committed digests in `.github/dhi-digests.json`.
+It shares the release workflow's amd64/arm64 builds, image tags, attestations,
+GitHub releases, and PHP extension smoke tests.
+
+**Check DHI Base Image Updates** runs daily at 10:00 UTC and can also be run
+manually. When base image digests change (including newly tracked images), it
+commits them and calls **Build DHI Images** with that exact commit. Unchanged
+digests skip the build. No GitHub issues are created.
+
+### Automated PHP Version Updates
+
+**Update PHP Alpine Versions** runs daily at 09:00 UTC and supports manual runs.
+It commits upstream PHP patch updates directly to the branch it runs on, then
+builds and publishes only the changed CLI/FPM image directories, including
+matching MSSQL variants. Builds use the exact update commit. No changes means
+no commit or build, and no pull requests are created.
 
 ### Workflow Description:
 
