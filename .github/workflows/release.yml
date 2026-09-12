@@ -15,6 +15,10 @@ on:
         description: JSON array of image type/version pairs to build; empty discovers all matching images
         type: string
         default: ''
+      fresh_build:
+        description: Pull base images and rebuild all layers to pick up available package fixes
+        type: boolean
+        default: false
       ref:
         description: Commit to check out and build
         type: string
@@ -234,6 +238,8 @@ jobs:
         with:
           context: ./${{ matrix.type }}
           push: true
+          pull: ${{ inputs.fresh_build || false }}
+          no-cache: ${{ inputs.fresh_build || false }}
           platforms: linux/amd64,linux/arm64
           provenance: mode=max
           sbom: true

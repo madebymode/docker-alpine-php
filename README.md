@@ -35,6 +35,14 @@ Available versions of our images along with their Docker Hub links:
 - [8.2-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.2-cli), [8.2-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.2-fpm)
 - [8.3-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.3-cli), [8.3-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.3-fpm)
 - [8.4-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.4-cli), [8.4-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.4-fpm)
+- [8.5-cli](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.5-cli), [8.5-fpm](https://hub.docker.com/r/mxmd/php/tags?page=1&name=8.5-fpm)
+
+Pull the standard PHP 8.5 images with:
+
+```bash
+docker pull mxmd/php:8.5-cli
+docker pull mxmd/php:8.5-fpm
+```
 
 #### Hardened FPM Images (`fpm-hardened`)
 
@@ -64,51 +72,33 @@ See per-version READMEs for full Compose examples:
 
 #### Usage with Docker Compose
 
-You can integrate our PHP images into your Docker Compose workflows:
+Use the PHP 8.5 DHI image as your PHP-FPM service in Docker Compose:
 
 ```yaml
 services:
-  php74-fpm:
-    platform: linux/arm64/v8
-    image: mxmd/php:7.4.33-fpm
-    ports:
-      - "9000:9000"
+  php:
+    image: mxmd/php:fpm-hardened-8.5
+    user: "${HOST_USER_UID:-1000}:${HOST_USER_GID:-1000}"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    expose:
+      - "9000"
     volumes:
-      # real time sync for app php files
       - .:/app
-      # cache laravel libraries dir
-      - ./vendor:/app/vendor:cached
-      # logs and sessions should be authorative inside docker
-      - ./storage:/app/storage:delegated
-      # cache static assets bc fpm doesn't need to update css or js
-      - ./public:/app/public:cached
-      # additional php config
-      - ./docker-conf/php-ini:/usr/local/etc/php/custom.d
-    env_file:
-      - .env
-    environment:
-      # tell PHP to scan for our mounted custom ini files - preferabbly mount with zz-custom.ini
-      - PHP_INI_SCAN_DIR=/usr/local/etc/php/conf.d/:/usr/local/etc/php/custom.d
-      # composer
-      - COMPOSER_AUTH=${COMPOSER_AUTH}
-      # these are CRITICAL for linux hosts - our entrypoint will skip these for macOS if they conflict with GID:20 on the container
-      - HOST_USER_UID=${HOST_USER_UID:-1000}
-      - HOST_USER_GID=${HOST_USER_GID:-1000}
-      # production flag will enable opcache and production php.ini settings
-      - HOST_ENV=${HOST_ENV:-production}
-      # our entrypoint uses the www-data user for cmd entry that's not php-fpm - swap to EXEC_AS_ROOT=1 if you wanna exec as the root user
-      - EXEC_AS_ROOT=0
-    ...
-  php74-cli:
-    image: mxmd/php:7.4.33-cli
-    ...
+      - ./docker-conf/php-ini:/opt/mode/conf.d:ro
 ```
 
-**Note**: Adjust volume paths or environment variables as per your project's requirements.
+The project is mounted at `/app`, and PHP loads custom `.ini` files from
+`./docker-conf/php-ini` through `/opt/mode/conf.d`. Temporary files use `/tmp`
+and `/run`. The image's built-in healthcheck queries FPM using `fcgi-health`.
+Configure your web server's FastCGI upstream as `php:9000`.
 
-### Required Environment Variables
+### Host UID/GID Variables
 
-Ensure these environment variables exist on your host machine:
+Set these variables to run PHP with the same UID/GID as the owner of your
+bind-mounted project files. The Compose example defaults each value to `1000`:
 
 ```bash
 HOST_USER_GID
@@ -139,11 +129,15 @@ echo "export HOST_USER_GID=$(id -g)" >> ~/.bash_profile && echo "export HOST_USE
 
 ### Optional Environment Variables
 
-Enabling the following environment variable activates the opcache and uses `php.ini` production settings:
+For standard CLI/FPM images, this variable activates OPcache and production
+`php.ini` settings:
 
 ```ini
 HOST_ENV=production
 ```
+
+The DHI images include their OPcache and FPM performance settings in the image.
+
 ---
 
 ## Building Images:
@@ -209,64 +203,117 @@ For all available types and versions:
 ```
 
 
-## 3. GitHub Actions
+## 3. GitHub Actions and CI
 
-### Automated DHI Builds
+The workflows discover image directories containing both a `.env` file and a
+`Dockerfile`. Full builds currently include standard CLI/FPM images for PHP
+7.1–8.5, the 8.4 MSSQL variants, and hardened FPM images for PHP 8.2–8.5.
+Each build reads its PHP version, Alpine line, and image tag settings from the
+corresponding `.env` file.
 
-Run **Build DHI Images** manually from the Actions tab to build and publish only
-the `fpm-hardened` images using the committed digests in `.github/dhi-digests.json`.
-It shares the release workflow's amd64/arm64 builds, image tags, attestations,
-GitHub releases, and PHP extension smoke tests.
+### Workflow Overview
 
-**Check DHI Base Image Updates** runs daily at 10:00 UTC and can also be run
-manually. When base image digests change (including newly tracked images), it
-commits them and calls **Build DHI Images** with that exact commit. Unchanged
-digests skip the build. No GitHub issues are created.
+| Workflow | Trigger | Behavior |
+| --- | --- | --- |
+| [Test Builds](.github/workflows/test-build.yml) | Push to `dev`; same-repository pull request targeting `master` | Validates all discovered images with amd64 and arm64 builds and hardened PHP extension smoke tests on amd64. |
+| [Build Docker Images](.github/workflows/release.yml) | Push to `master`; manual run; reusable workflow call | Builds and publishes all discovered images, or a selected set supplied by another workflow. Publishes attestations, image tags, and GitHub releases. |
+| [Build DHI Images](.github/workflows/build-dhi.yml) | Manual run; call from the DHI update checker | Uses the shared release workflow to build and publish only `fpm-hardened` images. |
+| [Update PHP Alpine Versions](.github/workflows/update-php-alpine-versions.yml) | Daily at **09:00 UTC**; manual run | Updates tracked CLI/FPM PHP patch versions, commits directly, and builds only changed image directories. |
+| [Check DHI Base Image Updates](.github/workflows/check-dhi-updates.yml) | Daily at **10:00 UTC**; manual run | Checks DHI builder/runtime digests, commits changes, and rebuilds all hardened FPM images when digests change. |
+| [Scan Docker Images for Fixes](.github/workflows/scan-docker-images.yml) | Daily at **11:00 UTC**; manual run | Scans published images with Docker Scout and requests fresh builds only for images with fixable CVEs. |
 
-### Automated PHP Version Updates
+### Builds, Tags, and Releases
 
-**Update PHP Alpine Versions** runs daily at 09:00 UTC and supports manual runs.
-It commits upstream PHP patch updates directly to the branch it runs on, then
-builds and publishes only the changed CLI/FPM image directories, including
-matching MSSQL variants. Builds use the exact update commit. No changes means
-no commit or build, and no pull requests are created.
+Publishing builds use Docker Buildx and QEMU for `linux/amd64` and `linux/arm64`.
+They publish maximum-mode provenance, SBOM attestations, and these Docker Hub
+tags:
 
-### Workflow Description:
+| Image family | Published tag examples |
+| --- | --- |
+| Standard CLI/FPM | `8.5.10-cli`, `8.5-cli`, `8.5.10-fpm`, `8.5-fpm` |
+| MSSQL | `<PHP_VERSION>-mssql-cli`, `8.4-mssql-cli`, and the corresponding `-fpm` tags |
+| Hardened FPM | `fpm-hardened-8.5` and the configured tags for the other hardened versions |
 
-**Trigger**:
-- Activates on `push` events to the `master` branch.
+Each tag also receives a timestamped variant with a `-YYYYMMDDHHMM` suffix.
+GitHub releases are created for new image-tag prefixes and new published
+manifest digests. Digest release notes include the Docker digest, published
+tags, and digest references. Each selected image is built and published on every
+release-workflow run.
 
-**Jobs**:
+Hardened builds pin both the DHI development and FPM runtime bases using
+[`.github/dhi-digests.json`](.github/dhi-digests.json). After publishing, the
+release workflow checks the amd64 image for `bcmath`, `bz2`, `exif`, `gd`,
+`mysqli`, `pdo_mysql`, and `zip`. The test workflow checks the same extensions
+in a locally loaded amd64 image. These runtime smoke tests run on amd64;
+build validation covers both architectures.
 
-1. **create-release-and-build**:
-   - **Environment**: Runs on the latest Ubuntu.
-   - **Matrix Strategy**: Sets combinations of PHP versions from '7.1' to '8.2' for both 'cli' and 'fpm' images.
+The shared release workflow accepts these inputs from other workflows:
 
-   **Steps**:
-   - **Checkout repository**: Pulls the latest code from the repository.
-   - **Setup GitHub CLI**: Initializes the GitHub CLI and logs in using the provided GitHub token.
-   - **Create Releases**: If a `.env` file exists in the specified directory and a GitHub release for the given tag doesn't already exist, it creates a new release for the specific PHP version and type.
-   - **Set up environment variables**: Sources the `.env` file from the specified directory and sets PHP_VERSION and ALPINE_VERSION as environment variables.
-   - **Set up QEMU**: A tool to run code made for one machine on another, useful for multi-architecture builds.
-   - **Set up Docker Buildx**: Initializes Buildx, an extended builder with additional features.
-   - **Log in to Docker Hub**: Uses the provided secrets to log into Docker Hub.
-   - **Build Docker images**: Constructs Docker images for both amd64 and arm64 platforms without pushing them.
-   - **Push Docker images (if new tag)**: If a new release tag was created in the "Create Releases" step, this step pushes the built images to Docker Hub.
+| Input | Purpose |
+| --- | --- |
+| `image_type` | Restricts discovery to an image family, such as `fpm-hardened`. Empty selects all families. |
+| `image_matrix` | Selects explicit type/version pairs, such as `[{"type":"fpm","version":"8.5"}]`. Requested images must exist in the discovered build set. |
+| `ref` | Checks out the commit to build and uses it as the GitHub release target. |
+| `fresh_build` | Pulls base images and disables the build cache. Scout-triggered rebuilds enable this. |
 
-### Key Features:
+### Automated Version and Digest Updates
 
-- **Matrix Builds**: The workflow is designed to run builds for multiple PHP versions and types concurrently, maximizing efficiency.
+The PHP updater reads Docker official-images metadata through
+[`update_php_alpine_versions.py`](.github/scripts/update_php_alpine_versions.py).
+It matches each tracked PHP major/minor version, image type, and Alpine line;
+updates stay within existing image directories and configured Alpine lines. Matching
+MSSQL directories are updated alongside their standard CLI/FPM counterparts.
+Changes are committed directly to the branch the workflow runs on, and only
+the affected directories are passed to the release workflow.
 
-- **Conditional Releases**: Only creates a new GitHub release if one for the specific PHP version and type doesn't already exist. This ensures that Docker images are only pushed when necessary.
+The DHI checker inspects the `dev` and `fpm` base tags for every hardened version.
+Changed or newly tracked digests are committed, then the DHI build workflow is
+called with the exact update commit. A DHI digest change rebuilds all hardened
+versions. Both updaters trigger builds after successfully committing and pushing
+detected changes.
 
-- **Multi-Architecture**: Utilizes Docker's Buildx and QEMU to build images suitable for both amd64 and arm64 architectures.
+### Scheduled Docker Scout Scans
 
-### Required Secrets:
+The Scout workflow scans the published rolling tags, including MSSQL and
+hardened variants. It resolves each tag to one immutable manifest digest and
+scans both amd64 and arm64 from that digest. Manual runs can select `all`,
+`cli`, `fpm`, or `fpm-hardened`.
 
-The workflow requires the following secrets:
+Only CVEs with available fixes trigger rebuilds. A finding on either
+architecture selects that image directory once, and the release workflow
+rebuilds both architectures by pulling base images and rebuilding every layer.
+Registry failures, scanner errors, or timeouts fail the scan and stop the
+automatic rebuild handoff for that run.
 
-- `GITHUB_TOKEN`: A token provided by GitHub to authenticate and gain required permissions. This is automatically available in GitHub Actions and does not need manual setup.
+Results appear in the workflow summary. Detailed Markdown reports and logs are
+saved in the `scout-reports` artifact for 30 days. Rebuilds pick up fixes available
+within the configured versions; findings that require changing a pinned
+dependency or base version can remain until that version is updated. The PHP
+and DHI update checks are scheduled earlier each day.
 
-- `DOCKER_HUB_USERNAME`: Your Docker Hub username.
+The scan-selection regression tests can be run locally with:
 
-- `DOCKER_HUB_ACCESS_TOKEN`: A token or password for Docker Hub to authenticate and push images.
+```bash
+python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
+```
+
+### Running Workflows Manually
+
+Open the repository's **Actions** tab, select a workflow, choose **Run workflow**,
+and select the branch. Use **Build Docker Images** for a full publishing build,
+**Build DHI Images** for hardened images, or one of the update/scan workflows to
+check upstream changes or available fixes first. **Test Builds** runs
+automatically on pushes to `dev` and same-repository pull requests to `master`.
+
+### Credentials and Permissions
+
+| Credential | Use |
+| --- | --- |
+| `DOCKER_HUB_USERNAME` | Repository secret used to log in to Docker Hub and DHI. |
+| `DOCKER_HUB_ACCESS_TOKEN` | Repository secret for pulling DHI bases, publishing to `mxmd/php`, and authenticating Docker Scout. |
+| `GITHUB_TOKEN` | Supplied automatically by GitHub Actions for repository access, update commits, and GitHub releases. |
+
+The build-test jobs use read-only repository permissions. Update and publishing
+jobs request `contents: write`; the Scout scan job uses read access and its
+rebuild job requests write access for releases. The configured Docker account
+must have access to the target repository, DHI base images, and Docker Scout.
