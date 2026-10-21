@@ -286,10 +286,32 @@ Registry failures, scanner errors, or timeouts fail the scan and stop the
 automatic rebuild handoff for that run.
 
 Results appear in the workflow summary. Detailed Markdown reports and logs are
-saved in the `scout-reports` artifact for 30 days. Rebuilds pick up fixes available
-within the configured versions; findings that require changing a pinned
-dependency or base version can remain until that version is updated. The PHP
-and DHI update checks are scheduled earlier each day.
+saved in the `scout-reports` artifact for 30 days. Rebuilds pick up fixes available within the configured versions; findings that
+require changing a pinned dependency or base version can remain until that
+version is updated. The PHP and DHI update checks are scheduled earlier each
+day.
+
+#### Updating Pinned MSSQL Driver Versions
+
+The MSSQL variants (`8.4-mssql-cli`, `8.4-mssql-fpm`) download the Microsoft
+ODBC driver and `mssql-tools18` directly from Microsoft's CDN at a hardcoded
+version. Unlike Alpine packages, these are **not updated automatically by
+rebuilds** — a CVE in `msodbcsql18` or `mssql-tools18` requires a manual
+version bump.
+
+To update, find the latest release on the [Microsoft ODBC driver for SQL Server
+(Alpine) install page](https://learn.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-ver17&tabs=alpine18-install),
+then update these three `ARG` lines in both `fpm/8.4-mssql/Dockerfile` and
+`cli/8.4-mssql/Dockerfile`:
+
+```dockerfile
+ARG MSSQL_VERSION=<new-version>   # e.g. 18.7.1.1-1
+ARG ODBC_GUID=<new-odbc-guid>     # from the msodbcsql18 download URL
+ARG TOOLS_GUID=<new-tools-guid>   # from the mssql-tools18 download URL
+```
+
+The GUIDs are the UUID path segments in the `download.microsoft.com/download/<GUID>/` URLs
+shown in the Microsoft install docs.
 
 The scan-selection regression tests can be run locally with:
 

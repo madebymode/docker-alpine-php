@@ -83,9 +83,9 @@ RUN if [ -z "$TARGETARCH" ]; then \
 # ─── Microsoft SQL Server (multi-arch, Alpine w/ sig verification) ─────────────
 ENV ACCEPT_EULA=Y
 
-ARG MSSQL_VERSION=18.6.2.1-1
-ARG ODBC_GUID=0b3d5518-b4a7-4a2b-afc7-7ee9e967f93c
-ARG TOOLS_GUID=cad0d30f-b9b1-4765-a011-81d8a66c8b8d
+ARG MSSQL_VERSION=18.7.1.1-1
+ARG ODBC_GUID=ade174b7-8cea-4543-91a6-c33ae320c2f0
+ARG TOOLS_GUID=a5dcc5e7-6124-49d3-8df4-48d738a0e784
 
 RUN set -eux; \
     # 1) install runtime + dev deps for ODBC & GPG

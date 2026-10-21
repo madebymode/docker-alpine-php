@@ -33,6 +33,16 @@ echo "export HOST_USER_GID=$(id -g)" >> ~/.bash_profile && echo "export HOST_USE
 ```
 
 
+### MSSQL Driver Version
+
+The Microsoft ODBC driver (`msodbcsql18`) and `mssql-tools18` are downloaded
+directly from Microsoft's CDN at a pinned version. They are **not updated
+automatically** by rebuilds — CVEs in these packages require a manual version
+bump to `MSSQL_VERSION`, `ODBC_GUID`, and `TOOLS_GUID` in the Dockerfile.
+
+See the [root README](../../README.md#updating-pinned-mssql-driver-versions)
+for instructions.
+
 ### optional ENV
 
 this will enable opcache and php.ini production settings
