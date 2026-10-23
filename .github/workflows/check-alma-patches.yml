@@ -1,0 +1,50 @@
+name: Check AlmaLinux PHP Security Patches
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  check-alma-patches:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+      ref: ${{ steps.commit.outputs.ref }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+
+      - name: Check AlmaLinux commits
+        run: python3 .github/scripts/check_alma_patches.py
+
+      - name: Commit updated patches file
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/alma-patches.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update AlmaLinux PHP security patch commits $(date +%Y-%m-%d)"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build-eol-images:
+    needs: check-alma-patches
+    if: needs.check-alma-patches.outputs.changed == 'true'
+    uses: ./.github/workflows/release.yml
+    with:
+      image_matrix: '[{"type":"cli","version":"7.2"},{"type":"fpm","version":"7.2"},{"type":"cli","version":"7.3"},{"type":"fpm","version":"7.3"},{"type":"cli","version":"7.4"},{"type":"fpm","version":"7.4"},{"type":"cli","version":"8.0"},{"type":"fpm","version":"8.0"},{"type":"cli","version":"8.1"},{"type":"fpm","version":"8.1"}]'
+      ref: ${{ needs.check-alma-patches.outputs.ref }}
+    secrets: inherit

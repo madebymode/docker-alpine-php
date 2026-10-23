@@ -136,6 +136,7 @@ append_common_build_args() {
     --build-arg ALPINE_IMAGE="alpine:$ALPINE_VERSION"
     --build-arg RUNTIME_BASE_IMAGE="$RUNTIME_BASE_IMAGE"
     --build-arg RUNTIME_BASE_DIGEST="$RUNTIME_BASE_DIGEST"
+    --build-arg ALMA_COMMIT="$ALMA_COMMIT"
     --file "$DIR/Dockerfile"
     "$t/"
   )
@@ -206,6 +207,12 @@ for target in "${TARGETS[@]}"; do
   TAGS=("$TAG")
   RUNTIME_BASE_IMAGE=""
   RUNTIME_BASE_DIGEST=""
+  ALMA_COMMIT=""
+
+  ALMA_FILE=".github/alma-patches.json"
+  if [[ -f "$ALMA_FILE" && -n "${PHP_VERSION_MAJOR:-}" ]]; then
+    ALMA_COMMIT=$(jq -r --arg v "$PHP_VERSION_MAJOR" '.[$v].commit // ""' "$ALMA_FILE")
+  fi
 
   if [[ "$t" == "fpm-hardened" ]]; then
     RUNTIME_BASE_IMAGE="dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-fpm"

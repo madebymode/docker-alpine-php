@@ -1,0 +1,4 @@
+# Local security regression tooling, fixtures, downloaded patches, and evidence.
+/security/
+/http/cves/2026/CVE-2026-109618.yaml
+/.github/workflows/security-regressions.yml
