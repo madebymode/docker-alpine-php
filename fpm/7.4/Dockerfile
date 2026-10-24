@@ -30,11 +30,13 @@ RUN set -eux; \
     test "$(wc -l < /tmp/patch-order.txt)" -gt 0
 
 WORKDIR /usr/src/php
-RUN while IFS= read -r name; do \
+RUN printf 'alma-commit: %s\npatches:\n' "${ALMA_COMMIT}" > /etc/php-alma-patches.txt; \
+    while IFS= read -r name; do \
         p="/tmp/patches/${name}"; \
         [ -f "$p" ] || continue; \
         echo "Applying: $p"; \
         patch -p1 < "$p" || exit 1; \
+        echo "  - ${name}" >> /etc/php-alma-patches.txt; \
     done < /tmp/patch-order.txt
 
 RUN cp /usr/include/gnu-libiconv/iconv.h /usr/include/iconv.h && \
@@ -65,6 +67,7 @@ COPY --from=php-patcher /usr/local/sbin/php-fpm /usr/local/sbin/php-fpm
 COPY --from=php-patcher /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
 COPY --from=php-patcher /usr/local/include/php/ /usr/local/include/php/
 COPY --from=php-patcher /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
+COPY --from=php-patcher /etc/php-alma-patches.txt /etc/php-alma-patches.txt
 
 RUN rm -f /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/v${ALPINE_VERSION}/main" >> /etc/apk/repositories && \
