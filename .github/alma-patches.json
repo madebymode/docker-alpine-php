@@ -1,0 +1,22 @@
+{
+  "7.2": {
+    "branch": "a8-stream-7.2",
+    "commit": "2c2c384d89086e6cbd3db0ee9c5b118b44ecd273"
+  },
+  "7.3": {
+    "branch": "a8-stream-7.3",
+    "commit": "815f805f624d87238b5fd8ff11ad3bd21a28e834"
+  },
+  "7.4": {
+    "branch": "a8-stream-7.4",
+    "commit": "f9bae1f7c1b113362d7b210974aba3ba3caa8e64"
+  },
+  "8.0": {
+    "branch": "a8-stream-8.0",
+    "commit": "e35b8b262ca525bcda22bd148c0772d5d16c6f85"
+  },
+  "8.1": {
+    "branch": "a9-stream-8.1",
+    "commit": "cec9b5f678e799044b106200e76eccb834085e5c"
+  }
+}

@@ -91,6 +91,11 @@ jobs:
           BUILDER_BASE_DIGEST=""
           BUILDER_BASE_REF=""
           RUNTIME_BASE_REF=""
+          ALMA_COMMIT=""
+          if [[ -f ".github/alma-patches.json" ]]; then
+            ALMA_COMMIT=$(jq -r --arg v "$PHP_VERSION_MAJOR" '.[$v].commit // ""' ".github/alma-patches.json")
+          fi
+
           if [[ "${{ matrix.type }}" == "fpm-hardened" ]]; then
             DIGEST_FILE=".github/dhi-digests.json"
             BUILDER_BASE_IMAGE="dhi.io/php:${PHP_VERSION_MAJOR}-alpine${ALPINE_VERSION}-dev"
@@ -109,7 +114,7 @@ jobs:
             RUNTIME_BASE_REF="${RUNTIME_BASE_IMAGE}@${RUNTIME_BASE_DIGEST}"
           fi
 
-          for VAR_NAME in DIR PLATFORM PHP_VERSION PHP_VERSION_MAJOR ALPINE_VERSION IMAGE_REPO BUILD_TAG BUILDER_BASE_IMAGE BUILDER_BASE_DIGEST BUILDER_BASE_REF RUNTIME_BASE_IMAGE RUNTIME_BASE_DIGEST RUNTIME_BASE_REF; do
+          for VAR_NAME in DIR PLATFORM PHP_VERSION PHP_VERSION_MAJOR ALPINE_VERSION IMAGE_REPO BUILD_TAG BUILDER_BASE_IMAGE BUILDER_BASE_DIGEST BUILDER_BASE_REF RUNTIME_BASE_IMAGE RUNTIME_BASE_DIGEST RUNTIME_BASE_REF ALMA_COMMIT; do
             echo "$VAR_NAME=${!VAR_NAME}" >> "$GITHUB_ENV"
           done
 
@@ -154,6 +159,7 @@ jobs:
             RUNTIME_BASE_IMAGE=${{ env.RUNTIME_BASE_IMAGE }}
             RUNTIME_BASE_DIGEST=${{ env.RUNTIME_BASE_DIGEST }}
             RUNTIME_BASE_REF=${{ env.RUNTIME_BASE_REF }}
+            ALMA_COMMIT=${{ env.ALMA_COMMIT }}
           file: ${{ env.DIR }}/Dockerfile
 
       - name: Smoke test hardened PHP extensions
@@ -176,6 +182,7 @@ jobs:
             --build-arg RUNTIME_BASE_IMAGE="$RUNTIME_BASE_IMAGE" \
             --build-arg RUNTIME_BASE_DIGEST="$RUNTIME_BASE_DIGEST" \
             --build-arg RUNTIME_BASE_REF="$RUNTIME_BASE_REF" \
+            --build-arg ALMA_COMMIT="$ALMA_COMMIT" \
             --file "$DIR/Dockerfile" \
             "./${{ matrix.type }}"
 
