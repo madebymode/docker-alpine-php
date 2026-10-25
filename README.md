@@ -110,7 +110,7 @@ docker pull mxmd/php:8.5-fpm@sha256:<digest>
 
 ### CVE Scanning
 
-A daily Docker Scout scan checks all published rolling tags across both `linux/amd64` and `linux/arm64`. Only CVEs with available fixes trigger an automatic rebuild — the release workflow re-pulls base images and rebuilds every layer from scratch to pick up the fix. Detailed scan reports are saved as workflow artifacts for 30 days.
+A daily Docker Scout scan checks all published rolling tags across both `linux/amd64` and `linux/arm64`. High or critical CVEs with available fixes trigger an automatic rebuild. Standard CLI and FPM scans include inherited base-image packages, and fresh rebuilds rerun `apk upgrade` to install available Alpine fixes. Hardened scans continue to exclude base-image findings: DHI base fixes are handled by the digest checker and remain pinned in `.github/dhi-digests.json`. Detailed scan reports are saved as workflow artifacts for 30 days.
 
 See [SECURITY.md](SECURITY.md) for the security policy, backport build process,
 validation results, [upstream regression tests you can run](SECURITY.md#run-the-upstream-regression-tests-yourself),
@@ -343,7 +343,7 @@ The GUIDs are the UUID path segments in the `download.microsoft.com/download/<GU
 
 ### Running Workflows Manually
 
-Open the **Actions** tab, select a workflow, and choose **Run workflow**. Use **Build Docker Images** for a full publish, **Build DHI Images** for hardened only, or the individual update/scan workflows to check upstream changes first. **Test Builds** runs automatically on pushes to `dev` and PRs targeting `master`.
+Open the **Actions** tab, select a workflow, and choose **Run workflow**. Use **Build Docker Images** for a full publish; leave `fresh_build` enabled to rerun package upgrades. Standard CLI/FPM builds always pull their base tags, including test builds. DHI builder/runtime references remain pinned to the recorded digests. Use **Build DHI Images** for hardened only, or the individual update/scan workflows to check upstream changes first. **Test Builds** runs automatically on pushes to `dev` and PRs targeting `master`.
 
 The scan-selection regression tests can be run locally:
 

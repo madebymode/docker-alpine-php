@@ -5,6 +5,11 @@ on:
     branches:
       - master
   workflow_dispatch:
+    inputs:
+      fresh_build:
+        description: Rebuild layers for package fixes; DHI base digests stay pinned
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       image_type:
@@ -258,7 +263,7 @@ jobs:
         with:
           context: ./${{ matrix.type }}
           push: true
-          pull: ${{ inputs.fresh_build || false }}
+          pull: ${{ matrix.type != 'fpm-hardened' || inputs.fresh_build || false }}
           no-cache: ${{ inputs.fresh_build || false }}
           platforms: linux/amd64,linux/arm64
           provenance: mode=max

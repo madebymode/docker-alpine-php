@@ -73,10 +73,13 @@ def scan_images(repo_root: Path, reports_dir: Path, image_type: str) -> tuple[li
                 report = reports_dir / f'{prefix}-{platform.split("/")[1]}.md'
                 command = [
                     "docker", "scout", "cves", f"registry://{reference}@{digest}",
-                    "--platform", platform, "--only-fixed", "--ignore-base",
+                    "--platform", platform, "--only-fixed",
                     "--only-severity", "high,critical", "--exit-code",
                     "--format", "markdown", "--output", str(report),
                 ]
+                # Standard images upgrade inherited packages; DHI bases stay pinned.
+                if kind == "fpm-hardened":
+                    command.append("--ignore-base")
                 try:
                     result = subprocess.run(command, capture_output=True, text=True, timeout=600)
                     report.with_suffix(".log").write_text(result.stdout + result.stderr)

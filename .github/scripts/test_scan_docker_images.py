@@ -59,7 +59,7 @@ class ScanImagesTests(unittest.TestCase):
 
     def test_no_fixable_findings_skips_rebuild(self):
         self.add_image("cli", "8.5")
-        matrix, errors = self.scan()
+        matrix, errors, cve_ids = self.scan()
         self.assertEqual((matrix, errors), ([], []))
         scans = [command for command in self.commands if command[1] == "scout"]
         self.assertEqual(len(scans), 2)
@@ -73,7 +73,7 @@ class ScanImagesTests(unittest.TestCase):
         self.add_image("fpm", "8.5")
         reference = f"registry://mxmd/php:8.5-fpm@{self.digest}"
         self.statuses[(reference, "linux/arm64")] = 2
-        self.assertEqual(self.scan(), ([{"type": "fpm", "version": "8.5"}], []))
+        self.assertEqual(self.scan(), ([{"type": "fpm", "version": "8.5"}], [], set()))
 
     def test_both_platforms_with_fixes_produce_one_build(self):
         self.add_image("fpm-hardened", "8.5", "IMAGE_TAG=fpm-hardened-8.5\n")
@@ -81,8 +81,41 @@ class ScanImagesTests(unittest.TestCase):
         reference = f"registry://mxmd/php:fpm-hardened-8.5@{self.digest}"
         for platform in scanner.PLATFORMS:
             self.statuses[(reference, platform)] = 2
-        self.assertEqual(self.scan("fpm-hardened"), ([{"type": "fpm-hardened", "version": "8.5"}], []))
+        self.assertEqual(self.scan("fpm-hardened"), ([{"type": "fpm-hardened", "version": "8.5"}], [], set()))
         self.assertEqual(len(self.commands), 3)
+
+    def test_inherited_fix_selects_standard_images_and_preserves_dhi_filter(self):
+        for kind in scanner.IMAGE_TYPES:
+            self.add_image(kind, "8.5")
+        output = self.root / "outputs"
+
+        def inherited_finding(command, **kwargs):
+            result = self.docker(command, **kwargs)
+            if command[1] == "scout":
+                result.returncode = 0 if "--ignore-base" in command else 2
+                report = Path(command[command.index("--output") + 1])
+                report.write_text("CVE-2026-92392\n" if result.returncode == 2 else "")
+            return result
+
+        with (
+            patch.object(scanner, "REPO_ROOT", self.root),
+            patch.object(scanner.subprocess, "run", side_effect=inherited_finding),
+            patch.dict(os.environ, {"GITHUB_OUTPUT": str(output)}),
+            patch("sys.argv", ["scan", "--reports-dir", str(self.reports)]),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(scanner.main(), 0)
+        outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
+        self.assertEqual(outputs["has_fixes"], "true")
+        self.assertEqual(outputs["cve_list"], "CVE-2026-92392")
+        self.assertEqual(json.loads(outputs["matrix"]), [
+            {"type": "cli", "version": "8.5"},
+            {"type": "fpm", "version": "8.5"},
+        ])
+        scans = [command for command in self.commands if command[1] == "scout"]
+        self.assertEqual(len(scans), 6)
+        for command in scans:
+            self.assertEqual("--ignore-base" in command, "fpm-hardened" in command[3])
 
     def test_scanner_failure_blocks_workflow_outputs(self):
         self.add_image("cli", "8.5")
@@ -105,7 +138,7 @@ class ScanImagesTests(unittest.TestCase):
     def test_registry_failure_is_reported(self):
         self.add_image("cli", "8.5")
         with patch.object(scanner.subprocess, "run", side_effect=subprocess.CalledProcessError(1, "docker", stderr="denied")):
-            matrix, errors = scanner.scan_images(self.root, self.reports, "all")
+            matrix, errors, cve_ids = scanner.scan_images(self.root, self.reports, "all")
         self.assertEqual(matrix, [])
         self.assertEqual(len(errors), 1)
         self.assertEqual((self.reports / "cli-8.5-resolve.log").read_text(), "denied")
@@ -114,7 +147,7 @@ class ScanImagesTests(unittest.TestCase):
         self.add_image("cli", "8.5")
         reference = f"registry://mxmd/php:8.5-cli@{self.digest}"
         self.statuses[(reference, "linux/amd64")] = subprocess.TimeoutExpired("docker", 600)
-        matrix, errors = self.scan()
+        matrix, errors, cve_ids = self.scan()
         self.assertEqual(matrix, [])
         self.assertEqual(len(errors), 1)
         self.assertIn("timed out", errors[0])

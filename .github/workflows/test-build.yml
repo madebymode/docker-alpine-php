@@ -146,6 +146,7 @@ jobs:
         with:
           context: ./${{ matrix.type }}
           push: false
+          pull: ${{ matrix.type != 'fpm-hardened' }}
           platforms: linux/amd64,linux/arm64
           tags: ${{ env.BUILD_TAG }}
           build-args: |
