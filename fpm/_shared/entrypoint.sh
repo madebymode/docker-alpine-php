@@ -30,6 +30,22 @@ else
     fi
 fi
 
+# Images that opt into PHP_ENABLE_EXIF use the same INI toggle as SOAP.
+# Leave existing defaults unchanged for images that do not set this variable.
+if [ "${PHP_ENABLE_EXIF+x}" = "x" ]; then
+    if [ "$PHP_ENABLE_EXIF" = "true" ] || [ "$PHP_ENABLE_EXIF" = "1" ]; then
+        if [ -f "$PHP_INI_DIR/conf.d/docker-php-ext-exif.disabled" ]; then
+            mv "$PHP_INI_DIR/conf.d/docker-php-ext-exif.disabled" "$PHP_INI_DIR/conf.d/docker-php-ext-exif.ini"
+            echo "EXIF extension enabled"
+        fi
+    else
+        if [ -f "$PHP_INI_DIR/conf.d/docker-php-ext-exif.ini" ]; then
+            mv "$PHP_INI_DIR/conf.d/docker-php-ext-exif.ini" "$PHP_INI_DIR/conf.d/docker-php-ext-exif.disabled"
+            echo "EXIF extension disabled"
+        fi
+    fi
+fi
+
 # Modify www-data user and group IDs to match the host user and group IDs if the arguments are passed and not macOS
 if [ -n "$HOST_USER_UID" ] && [ -n "$HOST_USER_GID" ] && [ "$(uname)" != "Darwin" ] && [ "$HOST_USER_GID" != "20" ]; then
     usermod -u $HOST_USER_UID www-data

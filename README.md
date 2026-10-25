@@ -18,6 +18,28 @@ For production use, run the **hardened FPM** image on a **currently supported PH
 
 ---
 
+
+## Optional EXIF Extension
+
+All standard CLI and FPM variants, including MSSQL, compile EXIF as a shared
+extension. Like SOAP, EXIF is disabled by default and the entrypoint switches its
+configuration between `docker-php-ext-exif.ini` and `docker-php-ext-exif.disabled`.
+Set `PHP_ENABLE_EXIF=true` or `PHP_ENABLE_EXIF=1` to enable it on each service that
+needs it; other values disable it.
+
+```yaml
+environment:
+  PHP_ENABLE_EXIF: "true"
+```
+
+Recreate existing containers after changing the variable. Applications requiring
+`ext-exif` need it enabled for Composer and other CLI commands as well as FPM.
+
+Hardened FPM images already include and enable EXIF. Their configuration is
+independent of the standard images' entrypoint toggle.
+
+---
+
 ## How Images Are Built
 
 ### Active PHP versions (8.2–8.5)

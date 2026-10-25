@@ -52,7 +52,7 @@ RUN cp /usr/include/gnu-libiconv/iconv.h /usr/include/iconv.h && \
 
 RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/include/ --with-webp=/usr/include/ && \
     docker-php-ext-install \
-    mysqli pdo pdo_mysql soap sockets json intl gd xml bz2 pcntl bcmath zip fileinfo phar
+    mysqli pdo pdo_mysql soap sockets json intl gd xml bz2 pcntl bcmath zip fileinfo phar exif
 
 FROM --platform=$TARGETPLATFORM php:${PHP_VERSION}-cli-alpine${ALPINE_VERSION}
 
@@ -78,7 +78,8 @@ RUN apk add --update --no-cache \
     libjpeg-turbo libwebp libpng fcgi su-exec shadow rsync gnu-libiconv
 
 # Check the final runtime, including its headers, libraries, and default INI files.
-RUN php -r 'exit(extension_loaded("soap") && class_exists("SoapClient") && class_exists("SoapServer") ? 0 : 1);'
+RUN php -r 'exit(extension_loaded("soap") && class_exists("SoapClient") && class_exists("SoapServer") ? 0 : 1);' && \
+    php -r 'exit(extension_loaded("exif") && function_exists("exif_read_data") && function_exists("exif_imagetype") ? 0 : 1);'
 
 ARG HOST_USER_GID
 ARG HOST_USER_UID
@@ -87,6 +88,8 @@ LABEL afterapk="php-cli-alpine-$PHP_VERSION"
 LABEL com.mxmd.alma-commit="${ALMA_COMMIT}"
 
 ARG HOST_ENV=development
+
+ENV PHP_ENABLE_EXIF=0
 
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer2
 RUN ln -s /usr/local/bin/composer2 /usr/local/bin/composer

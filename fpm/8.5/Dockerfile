@@ -58,6 +58,7 @@ RUN apk add --update --no-cache \
 # Note: opcache is built-in to PHP 8.5+ and no longer needs to be installed separately
 RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/include/ --with-webp=/usr/include/ && \
   docker-php-ext-install \
+    exif \
     bcmath \
     bz2 \
     gd \
@@ -70,12 +71,18 @@ RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/i
     zip \
     && apk del -f .build-deps
 
+# Verify EXIF is available in the final runtime before entrypoint toggles.
+RUN php -r 'exit(extension_loaded("exif") && function_exists("exif_read_data") && function_exists("exif_imagetype") ? 0 : 1);' && \
+    php-fpm -i | grep -F 'EXIF Support => enabled'
+
 ARG HOST_USER_GID
 ARG HOST_USER_UID
 
 LABEL afterapk="php-fpm-alpine-$PHP_VERSION"
 
 ARG HOST_ENV=development
+
+ENV PHP_ENABLE_EXIF=0
 
 # Create and configure status.conf for PHP-FPM status page
 RUN echo '[www]' > /usr/local/etc/php-fpm.d/status.conf && \

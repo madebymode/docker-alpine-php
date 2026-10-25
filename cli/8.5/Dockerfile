@@ -60,6 +60,7 @@ RUN apk add --update --no-cache \
 # Configure & Install Extension
 RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/include/ --with-webp=/usr/include/ && \
   docker-php-ext-install \
+    exif \
     bcmath \
     bz2 \
     gd \
@@ -72,12 +73,17 @@ RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/i
     zip \
     && apk del -f .build-deps
 
+# Verify EXIF is available in the final runtime before entrypoint toggles.
+RUN php -r 'exit(extension_loaded("exif") && function_exists("exif_read_data") && function_exists("exif_imagetype") ? 0 : 1);'
+
 ARG HOST_USER_GID
 ARG HOST_USER_UID
 
 LABEL afterapk="php-cli-alpine-$PHP_VERSION"
 
 ARG HOST_ENV=development
+
+ENV PHP_ENABLE_EXIF=0
 
 
 

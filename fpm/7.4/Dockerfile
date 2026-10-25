@@ -53,7 +53,7 @@ RUN cp /usr/include/gnu-libiconv/iconv.h /usr/include/iconv.h && \
 
 RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/include/ --with-webp=/usr/include/ && \
     docker-php-ext-install \
-    mysqli pdo pdo_mysql soap sockets json intl gd xml bz2 pcntl bcmath zip fileinfo phar opcache
+    mysqli pdo pdo_mysql soap sockets json intl gd xml bz2 pcntl bcmath zip fileinfo phar exif opcache
 
 FROM --platform=$TARGETPLATFORM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
 
@@ -82,7 +82,9 @@ RUN apk add --update --no-cache \
 
 # Check the final runtime, including its headers, libraries, and default INI files.
 RUN php -r 'exit(extension_loaded("soap") && class_exists("SoapClient") && class_exists("SoapServer") ? 0 : 1);' && \
-    php-fpm -i | grep -F 'Soap Client => enabled'
+    php -r 'exit(extension_loaded("exif") && function_exists("exif_read_data") && function_exists("exif_imagetype") ? 0 : 1);' && \
+    php-fpm -i | grep -F 'Soap Client => enabled' && \
+    php-fpm -i | grep -F 'EXIF Support => enabled'
 
 ARG HOST_USER_GID
 ARG HOST_USER_UID
@@ -91,6 +93,8 @@ LABEL afterapk="php-fpm-alpine-$PHP_VERSION"
 LABEL com.mxmd.alma-commit="${ALMA_COMMIT}"
 
 ARG HOST_ENV=development
+
+ENV PHP_ENABLE_EXIF=0
 
 RUN echo '[www]' > /usr/local/etc/php-fpm.d/status.conf && \
     echo 'pm.status_path = /status' >> /usr/local/etc/php-fpm.d/status.conf

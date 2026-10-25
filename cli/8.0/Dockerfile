@@ -51,7 +51,7 @@ RUN ./configure $(php-config --configure-options) --with-iconv=/usr/local && \
 
 RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/include/ --with-webp=/usr/include/ && \
     docker-php-ext-install \
-    bcmath bz2 gd intl mysqli pcntl pdo_mysql soap sockets zip
+    bcmath exif bz2 gd intl mysqli pcntl pdo_mysql soap sockets zip
 
 FROM --platform=$TARGETPLATFORM php:${PHP_VERSION}-cli-alpine${ALPINE_VERSION}
 
@@ -79,6 +79,9 @@ RUN apk add --update --no-cache \
 # Check the final runtime, including its headers, libraries, and default INI files.
 RUN php -r 'exit(extension_loaded("soap") && class_exists("SoapClient") && class_exists("SoapServer") ? 0 : 1);'
 
+# Verify EXIF is available in the final runtime before entrypoint toggles.
+RUN php -r 'exit(extension_loaded("exif") && function_exists("exif_read_data") && function_exists("exif_imagetype") ? 0 : 1);'
+
 ARG HOST_USER_GID
 ARG HOST_USER_UID
 
@@ -86,6 +89,8 @@ LABEL afterapk="php-cli-alpine-$PHP_VERSION"
 LABEL com.mxmd.alma-commit="${ALMA_COMMIT}"
 
 ARG HOST_ENV=development
+
+ENV PHP_ENABLE_EXIF=0
 
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer2
 RUN ln -s /usr/local/bin/composer2 /usr/local/bin/composer

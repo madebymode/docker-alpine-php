@@ -42,6 +42,19 @@ HOST_ENV=production
 ```
 
 
+EXIF is compiled into the PHP 7.4 image as a shared extension and is disabled by
+default. Like SOAP, the entrypoint toggles its INI file based on an environment
+variable. Set `PHP_ENABLE_EXIF=true` or `PHP_ENABLE_EXIF=1` to enable it; other
+values disable it. Configure this on both CLI and FPM services when the application
+requires `ext-exif`:
+
+```yaml
+environment:
+  PHP_ENABLE_EXIF: "true"
+```
+
+Recreate existing containers after changing the environment variable.
+
 docker-compose.yml
 ```yaml
   php74:
