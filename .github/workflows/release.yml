@@ -320,7 +320,7 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Smoke test published hardened PHP extensions
+      - name: Smoke test published hardened PHP extensions and FPM performance defaults
         if: ${{ matrix.type == 'fpm-hardened' }}
         run: |
           set -euo pipefail
@@ -340,6 +340,8 @@ jobs:
               exit 1
             fi
           done
+
+          bash tests/fpm-performance/run.sh "${IMAGE_REPO}:${IMAGE_TAG}"
 
       - name: Publish digest tag on GitHub
         if: ${{ steps.push-image.outputs.digest != '' }}

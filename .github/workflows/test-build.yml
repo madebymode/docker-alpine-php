@@ -169,7 +169,7 @@ jobs:
             ALMA_COMMIT=${{ env.ALMA_COMMIT }}
           file: ${{ env.DIR }}/Dockerfile
 
-      - name: Smoke test hardened PHP extensions
+      - name: Smoke test hardened PHP extensions and FPM performance defaults
         if: ${{ matrix.type == 'fpm-hardened' }}
         run: |
           set -euo pipefail
@@ -202,3 +202,5 @@ jobs:
               exit 1
             fi
           done
+
+          bash tests/fpm-performance/run.sh "$SMOKE_TAG"

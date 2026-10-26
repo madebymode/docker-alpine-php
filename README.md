@@ -76,6 +76,12 @@ Hardened images use [CIS Docker Hardened Images (DHI)](https://dhi.io) as both t
 
 The DHI base image digests are pinned in [`.github/dhi-digests.json`](.github/dhi-digests.json) and updated daily. A digest change triggers a full rebuild of all hardened versions.
 
+All hardened versions set a 512 MB per-script PHP memory limit and share
+production OPcache settings: OPcache enabled, 256 MB
+cache, 32 MB interned strings, 32,531 script keys, timestamp checks disabled, and
+JIT disabled with no JIT buffer. Deploy into a fresh FPM container so code changes
+take effect. See [performance defaults, overrides, and monitoring](fpm-hardened/PERFORMANCE.md).
+
 ---
 
 ## Supply Chain Security
@@ -390,7 +396,15 @@ All three updaters commit directly to `master` and hand off to the release workf
 
 ### Hardened Image Smoke Tests
 
-After publishing, the release workflow pulls the amd64 hardened image and verifies these extensions are loaded: `bcmath`, `bz2`, `exif`, `gd`, `mysqli`, `pdo_mysql`, `zip`. The test workflow runs the same check on a locally loaded build. Smoke tests run on amd64 only; the build itself covers both architectures.
+After publishing, the release workflow pulls the amd64 hardened image and verifies these extensions are loaded: `bcmath`, `bz2`, `exif`, `gd`, `mysqli`, `pdo_mysql`, `zip`. Both workflows also start an isolated, read-only FPM container and make three FastCGI requests to verify the effective performance settings, the 512 MB script limit, Craft-required PHP extensions, active OPcache, and disabled JIT with no buffer. The test workflow checks a locally loaded build. Smoke tests run on amd64 only; the build itself covers both architectures.
+
+Run the FPM performance check locally against a built image:
+
+```bash
+bash tests/fpm-performance/run.sh mxmd/php:fpm-hardened-8.2
+```
+
+The check uses a disposable anonymous volume and removes its container and volume on exit. It does not need a host port or access to an application.
 
 ### Updating Pinned MSSQL Driver Versions
 

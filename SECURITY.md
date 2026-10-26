@@ -281,13 +281,16 @@ For Craft, replace the Laravel writable mounts with the paths your site uses:
 volumes:
   - ./app:/app:ro
   - ./app/storage:/app/storage:rw
+  - ./app/config/license.key:/app/config/license.key:rw
   - ./app/web/cpresources:/app/web/cpresources:rw
   - ./app/web/uploads:/app/web/uploads:rw  # Only for a configured local upload directory.
   - ./docker-conf/php-ini:/opt/mode/conf.d:ro
 ```
 
-Craft requires writable storage and generated control-panel resources; local
-asset paths depend on the site's filesystem configuration. Keep project
+Create `./app/config/license.key` as a file before starting the container and
+give the worker's UID/GID write access. Craft requires writable storage, its
+license key, and generated control-panel resources; local asset paths depend on
+the site's filesystem configuration. Keep project
 configuration and dependencies read-only in production, and perform updates
 through deployment. See [Craft's filesystem requirements](https://craftcms.com/docs/5.x/requirements)
 and [storage layout](https://craftcms.com/docs/5.x/system/directory-structure).

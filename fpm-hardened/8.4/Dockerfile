@@ -88,16 +88,6 @@ RUN mkdir -p /opt/dhi-conf && \
         'extension=zip.so' \
         > /opt/dhi-conf/zz-extensions.ini && \
     printf '%s\n' \
-        'opcache.jit=tracing' \
-        'opcache.jit_buffer_size=128M' \
-        'opcache.memory_consumption=256' \
-        'opcache.interned_strings_buffer=16' \
-        'opcache.max_accelerated_files=20000' \
-        'realpath_cache_size=4096K' \
-        'realpath_cache_ttl=600' \
-        'expose_php=Off' \
-        > /opt/dhi-conf/zz-performance.ini && \
-    printf '%s\n' \
         '[www]' \
         'pm.status_path = /status' \
         'pm = dynamic' \
@@ -133,7 +123,7 @@ COPY --from=builder /opt/dhi-extensions /usr/lib/php/extensions
 COPY --from=builder /opt/runtime-libs/ /
 COPY --from=builder /usr/share/mime /usr/share/mime
 COPY --from=builder /opt/dhi-conf/zz-extensions.ini  /etc/php-${PHP_VERSION_MAJOR}/conf.d/zz-extensions.ini
-COPY --from=builder /opt/dhi-conf/zz-performance.ini /etc/php-${PHP_VERSION_MAJOR}/conf.d/zz-performance.ini
+COPY _shared/zz-performance.ini /etc/php-${PHP_VERSION_MAJOR}/conf.d/zz-performance.ini
 COPY --from=builder /opt/dhi-conf/zz-fpm-pool.conf   /etc/php-${PHP_VERSION_MAJOR}/php-fpm.d/zz-fpm-pool.conf
 
 COPY --from=go-builder /fcgi-health /usr/local/bin/fcgi-health

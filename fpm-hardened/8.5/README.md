@@ -40,13 +40,29 @@ The shared MIME database from Alpine's `shared-mime-info` package is copied into
 ## Performance settings (baked in)
 
 ```ini
-opcache.jit=tracing
-opcache.jit_buffer_size=128M
+memory_limit=512M
+opcache.enable=1
+opcache.enable_cli=1
 opcache.memory_consumption=256
-opcache.max_accelerated_files=20000
+opcache.interned_strings_buffer=32
+opcache.max_accelerated_files=32531
+opcache.force_restart_timeout=180
+opcache.save_comments=1
+opcache.enable_file_override=0
+opcache.validate_timestamps=0
+opcache.jit=disable
+opcache.jit_buffer_size=0
+opcache.preload=
+opcache.preload_user=
+realpath_cache_size=4096K
 realpath_cache_ttl=600
 expose_php=Off
 ```
+
+These production defaults come from the shared [`zz-performance.ini`](../_shared/zz-performance.ini).
+Replace/restart the FPM container after deployments because timestamp validation is disabled.
+For development overrides, JIT/preload opt-in, and monitoring, see the
+[hardened image performance guide](../PERFORMANCE.md).
 
 FPM pool: `pm=dynamic`, `max_children=20`, `max_requests=500`.
 
