@@ -75,7 +75,7 @@ def scan_images(repo_root: Path, reports_dir: Path, image_type: str, publish_vex
                     vex = dhi_vex.prepare(f"{reference}@{digest}", vex_dir)
                     if publish_vex:
                         dhi_vex.publish(vex, vex_dir)
-                except (subprocess.SubprocessError, ValueError, KeyError, StopIteration, OSError) as exc:
+                except (subprocess.SubprocessError, ValueError, KeyError, StopIteration, OSError, RuntimeError) as exc:
                     errors.append(f"VEX preparation/publication failed for {reference}: {exc}; see {prefix}-vex/")
                     summary.append(f"| `{reference}@{digest}` | both | VEX failed; rebuild decisions skipped |")
                     continue
@@ -91,6 +91,7 @@ def scan_images(repo_root: Path, reports_dir: Path, image_type: str, publish_vex
                     "--format", "markdown", "--output", str(report),
                 ]
                 if kind == "fpm-hardened":
+                    command.extend(["--org", reference.split("/")[0], "--ignore-suppressed"])
                     if vex[platform]["vex"]:
                         command.extend(["--vex-location", vex[platform]["vex"]])
                     command.extend(["--only-vex-affected",

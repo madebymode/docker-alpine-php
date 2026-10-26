@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, unquote
 
+import scout_exceptions
+
 PLATFORMS = ("linux/amd64", "linux/arm64")
 PREDICATE = "https://openvex.dev/ns/v0.2.0"
 DIGEST = r"sha256:[0-9a-f]{64}"
@@ -237,6 +239,7 @@ def prepare(image: str, directory: Path, expected_base: str | None = None) -> di
 
 
 def publish(bundle: dict[str, dict[str, str]], directory: Path) -> None:
+    client = None
     for platform, source in bundle.items():
         # The architecture-specific subject prevents one platform's VEX crossing to another.
         if not source["attestation"]:
@@ -257,6 +260,11 @@ def publish(bundle: dict[str, dict[str, str]], directory: Path) -> None:
         docker(["scout", "attestation", "add", "--org", repository.split("/")[0],
                 "--referrer", "--file", source["vex"], "--predicate-type", PREDICATE,
                 source["image"]], directory, platform.replace("/", "-") + "-scout-publish")
+        if client is None:
+            client = scout_exceptions.Client(directory / "scout-api")
+        evidence = directory / platform.replace("/", "-")
+        evidence.mkdir(exist_ok=True)
+        scout_exceptions.publish(client, json.loads(Path(source["vex"]).read_text()), source["image"], evidence)
         print(f"Published derived OpenVEX for {source['image']} ({platform})", flush=True)
 
 

@@ -99,7 +99,15 @@ Each published document must pass `vexctl validate --strict` with no errors or
 warnings. `vexctl attest` creates the matching in-toto subjects, and ORAS publishes
 the complete attestation unchanged as an OCI 1.1 referrer in Docker Hub. This
 preserves the existing image tags and digests. The same validated assessment is
-also registered with Scout's referrer service for its scanner and Hub UI. CI pins vexctl revision
+also registered with Scout's referrer service. Publication then uses the Docker
+Scout GraphQL API to create an organization exception for each reported CVE
+covered by a verified `not_affected` statement. Each exception names one exact
+platform digest and package version, retains the DHI rationale, and uses the
+corresponding OpenVEX justification. Reruns reuse matching exceptions. Publication
+reads the image back and requires `isExcepted: true` with the expected exception
+ID; authentication, API, scope, or verification failures fail the workflow.
+API requests and responses are retained as evidence without credentials.
+CI pins vexctl revision
 `9f3461445f0ab76553eac55132a9084a2d1a4e63` (the latest tagged release, 0.4.4,
 does not include the validator) and ORAS 1.3.6.
 
@@ -130,10 +138,16 @@ A daily Docker Scout scan checks all published rolling tags across both `linux/a
 
 To refresh the VEX exceptions for existing hardened images without building them:
 
+Run **Scan Docker Images for Fixes** with `image_type: fpm-hardened` and
+`metadata_only: true`. This preserves daily scans and disables the rebuild job
+for that invocation, even if other fixable findings remain. For local use:
+
 ```bash
 docker login
 docker login dhi.io
 # Install the pinned vexctl and ORAS versions above and put them on PATH.
+# Export DOCKER_HUB_USERNAME and DOCKER_HUB_ACCESS_TOKEN from your secret store.
+# The account needs permission to create Scout exceptions in mxmd.
 python3 .github/scripts/scan_docker_images.py \
   --image-type fpm-hardened --publish-vex
 ```
@@ -141,7 +155,10 @@ python3 .github/scripts/scan_docker_images.py \
 Running the script directly writes reports and a proposed rebuild matrix; only
 the GitHub Actions workflow invokes the build workflow for remaining findings.
 
-Consumers using Scout must explicitly accept our VEX author:
+Organization members can use Scout's server-side exceptions with
+`--org mxmd --ignore-suppressed`. Organization exceptions are visible to members;
+the portable OpenVEX artifacts remain available to image consumers. Consumers
+outside the organization must explicitly accept our VEX author:
 
 ```bash
 docker scout cves registry://mxmd/php:fpm-hardened-8.5 \

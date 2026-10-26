@@ -125,6 +125,8 @@ class ScanImagesTests(unittest.TestCase):
             self.assertNotIn("--ignore-base", command)
             self.assertEqual("--only-vex-affected" in command, "fpm-hardened" in command[3])
             if "fpm-hardened" in command[3]:
+                self.assertIn("--ignore-suppressed", command)
+                self.assertEqual(command[command.index("--org") + 1], "mxmd")
                 platform = command[command.index("--platform") + 1]
                 self.assertEqual(command[command.index("--vex-location") + 1], self.vex[platform]["vex"])
 
@@ -149,7 +151,7 @@ class ScanImagesTests(unittest.TestCase):
         self.add_image("fpm-hardened", "8.5")
         for operation in (self.prepare, self.publish):
             with self.subTest(operation=operation):
-                operation.side_effect = ValueError("invalid VEX")
+                operation.side_effect = RuntimeError("Scout did not confirm effective suppression") if operation is self.publish else ValueError("invalid VEX")
                 matrix, errors, cve_ids = scanner.scan_images(self.root, self.reports, "all", True)
                 self.assertEqual(matrix, [])
                 self.assertTrue(errors)

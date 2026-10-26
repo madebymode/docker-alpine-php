@@ -123,7 +123,9 @@ class VexTests(unittest.TestCase):
             bundle = dhi_vex.prepare(IMAGE, directory, BASE)
             self.assertEqual(len(bundle), 2)
             self.assertFalse(any("add" in call for call in calls))
-            dhi_vex.publish(bundle, directory)
+            with patch.object(dhi_vex.scout_exceptions, "Client"), patch.object(dhi_vex.scout_exceptions, "publish") as exceptions:
+                dhi_vex.publish(bundle, directory)
+                self.assertEqual(exceptions.call_count, 2)
             self.assertEqual(validate.call_count, 2)
             publications = [call.args[0] for call in runner.call_args_list]
             self.assertEqual([call[-2] for call in publications], ["docker.io/mxmd/php@sha256:" + "c" * 64, "docker.io/mxmd/php@sha256:" + "d" * 64])

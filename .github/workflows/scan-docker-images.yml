@@ -14,6 +14,10 @@ on:
           - cli
           - fpm
           - fpm-hardened
+      metadata_only:
+        description: Refresh verified VEX and Scout exceptions without rebuilding images
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -36,6 +40,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6.0.2
+
+      - name: Test security automation
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4.0.0
@@ -70,6 +77,8 @@ jobs:
         id: scan
         env:
           IMAGE_TYPE: ${{ inputs.image_type || 'all' }}
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
         run: python3 .github/scripts/scan_docker_images.py --image-type "$IMAGE_TYPE" --publish-vex
 
       - name: Save Scout reports
@@ -83,7 +92,7 @@ jobs:
 
   rebuild:
     needs: scan
-    if: needs.scan.outputs.has_fixes == 'true'
+    if: needs.scan.outputs.has_fixes == 'true' && inputs.metadata_only != true
     permissions:
       contents: write
     uses: ./.github/workflows/release.yml

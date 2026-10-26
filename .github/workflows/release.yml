@@ -303,6 +303,8 @@ jobs:
         if: ${{ matrix.type == 'fpm-hardened' }}
         env:
           IMAGE_DIGEST: ${{ steps.push-image.outputs.digest }}
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
         run: |
           python3 .github/scripts/dhi_vex.py \
             --image "${IMAGE_REPO}:${IMAGE_TAG}@${IMAGE_DIGEST}" \
