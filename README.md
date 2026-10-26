@@ -95,6 +95,14 @@ SHA-256 file checksums. The original Docker document and signature verification
 are retained as evidence, and our statements cite that assessment. We do not
 attribute our derived-image assertions to Docker.
 
+VEX publication runs after the Docker push, using its returned image digest.
+Verification first checks the public Rekor transparency log. If Scout reports
+`signature not found in transparency log`, retrieval retries with
+`--verify --skip-tlog`, still verifying against Docker's signing key as described
+in [Docker's DHI verification guidance](https://docs.docker.com/dhi/how-to/verify/#handle-missing-transparency-log-entries).
+Both attempt logs and the verification mode in `sources.json` are retained as
+audit evidence. Other verification failures stop publication.
+
 Each published document must pass `vexctl validate --strict` with no errors or
 warnings. `vexctl attest` creates the matching in-toto subjects, and ORAS publishes
 the complete attestation unchanged as an OCI 1.1 referrer in Docker Hub. This

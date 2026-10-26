@@ -194,6 +194,54 @@ class VexTests(unittest.TestCase):
             with self.assertRaises(subprocess.CalledProcessError):
                 dhi_vex.docker(["scout", "vex", "get"], Path(temporary), "verify")
 
+    def test_missing_rekor_entry_retries_with_signature_verification_and_separate_logs(self):
+        calls = []
+
+        def docker(arguments, directory, name):
+            calls.append((arguments, name))
+            if "--skip-tlog" not in arguments:
+                upstream.write_text("partial unverified output")
+                raise subprocess.CalledProcessError(1, arguments, stderr="no matching signatures: signature not found in transparency log")
+            self.assertFalse(upstream.exists())
+            upstream.write_text(json.dumps(vex()))
+            return ""
+
+        with tempfile.TemporaryDirectory() as temporary, patch.object(dhi_vex, "docker", side_effect=docker):
+            directory = Path(temporary)
+            upstream = directory / "upstream.json"
+            mode = dhi_vex.retrieve_verified_vex(BASE, "linux/amd64", upstream, directory)
+            self.assertEqual(mode, "docker-signature-without-transparency-log")
+            self.assertEqual(len(calls), 2)
+            self.assertTrue(all("--verify" in command for command, _ in calls))
+            self.assertTrue(all("registry://" + BASE in command for command, _ in calls))
+            self.assertEqual([name for _, name in calls], ["amd64-vex-runtime", "amd64-vex-runtime-skip-tlog"])
+
+    def test_successful_rekor_verification_does_not_retry(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(dhi_vex, "docker", return_value="") as docker:
+            directory = Path(temporary)
+            mode = dhi_vex.retrieve_verified_vex(BASE, "linux/arm64", directory / "upstream.json", directory)
+            self.assertEqual(mode, "signature-and-transparency-log")
+            self.assertEqual(docker.call_count, 1)
+            self.assertNotIn("--skip-tlog", docker.call_args.args[0])
+
+    def test_other_verification_failures_never_skip_rekor(self):
+        for error in ("signature invalid", "unauthorized", "no VEX attestations found for image", "connection timed out"):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temporary, patch.object(dhi_vex, "docker", side_effect=subprocess.CalledProcessError(1, "docker", stderr=error)) as docker:
+                directory = Path(temporary)
+                with self.assertRaises(subprocess.CalledProcessError):
+                    dhi_vex.retrieve_verified_vex(BASE, "linux/amd64", directory / "upstream.json", directory)
+                self.assertEqual(docker.call_count, 1)
+
+    def test_signature_failure_after_missing_rekor_entry_still_blocks(self):
+        failures = [subprocess.CalledProcessError(1, "docker", stderr=error) for error in (
+            "signature not found in transparency log", "signature invalid",
+        )]
+        with tempfile.TemporaryDirectory() as temporary, patch.object(dhi_vex, "docker", side_effect=failures) as docker:
+            directory = Path(temporary)
+            with self.assertRaisesRegex(subprocess.CalledProcessError, "non-zero exit"):
+                dhi_vex.retrieve_verified_vex(BASE, "linux/amd64", directory / "upstream.json", directory)
+            self.assertEqual(docker.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

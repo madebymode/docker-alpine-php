@@ -32,6 +32,28 @@ def docker(arguments: list[str], directory: Path, name: str) -> str:
     return run(["docker", *arguments], directory, name)
 
 
+def retrieve_verified_vex(source: str, platform: str, upstream: Path, directory: Path) -> str:
+    """Verify Docker's signature even when DHI has no public Rekor entry."""
+    architecture = platform.split("/")[1]
+    command = ["scout", "vex", "get", f"registry://{source}", "--platform", platform,
+               "--verify", "--output", str(upstream)]
+    upstream.unlink(missing_ok=True)
+    try:
+        docker(command, directory, f"{architecture}-vex-runtime")
+        return "signature-and-transparency-log"
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stdout or "") + (exc.stderr or "")
+        if "signature not found in transparency log" not in detail:
+            raise
+        # Docker documents that DHI may omit public Rekor entries. This retry
+        # retains --verify and Scout's Docker signing key; all other failures
+        # still stop publication. Keep the original failure log for auditors.
+        print(f"No public Rekor entry for {platform}; retrying Docker signature verification without the transparency log", flush=True)
+        upstream.unlink(missing_ok=True)
+        docker([*command, "--skip-tlog"], directory, f"{architecture}-vex-runtime-skip-tlog")
+        return "docker-signature-without-transparency-log"
+
+
 def recorded_base(provenance: dict, platform: str, stage: str = "runtime") -> str:
     """Use the build's recorded base, never today's rolling tag or digest pins."""
     slsa = provenance[platform]["SLSA"]
@@ -207,10 +229,9 @@ def prepare(image: str, directory: Path, expected_base: str | None = None) -> di
             raise ValueError(f"Published {platform} base differs from the release's pinned base")
         print(f"Checking verified DHI VEX for {platform}: {base}", flush=True)
         upstream = directory / f"{architecture}.upstream.vex.json"
-        upstream.unlink(missing_ok=True)
         source = base
         try:
-            docker(["scout", "vex", "get", f"registry://{source}", "--platform", platform, "--verify", "--output", str(upstream)], directory, f"{architecture}-vex-runtime")
+            verification = retrieve_verified_vex(source, platform, upstream, directory)
         except subprocess.CalledProcessError as exc:
             if "no VEX attestations found for image" not in (exc.stdout or "") + (exc.stderr or ""):
                 raise
@@ -233,7 +254,7 @@ def prepare(image: str, directory: Path, expected_base: str | None = None) -> di
         target_image = f"{repository}@{target}"
         vex_file.write_text(json.dumps(derive(document, sboms[1], target_image, source, built_at), indent=2) + "\n")
         attestation = validate_and_attest(vex_file, directory, architecture, upstream)
-        bundle[platform] = {"base": base, "source": source, "image": target_image, "vex": str(vex_file), "attestation": str(attestation)}
+        bundle[platform] = {"base": base, "source": source, "image": target_image, "vex": str(vex_file), "attestation": str(attestation), "verification": verification}
     (directory / "sources.json").write_text(json.dumps(bundle, indent=2) + "\n")
     return bundle
 
