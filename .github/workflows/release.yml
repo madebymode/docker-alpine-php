@@ -284,6 +284,40 @@ jobs:
             ALMA_COMMIT=${{ env.ALMA_COMMIT }}
           file: ${{ env.DIR }}/Dockerfile
 
+      - name: Install Docker Scout for hardened VEX publication
+        if: ${{ matrix.type == 'fpm-hardened' }}
+        run: |
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/docker/scout-cli/v1.27.0/install.sh \
+            --output "$RUNNER_TEMP/install-scout.sh"
+          sh "$RUNNER_TEMP/install-scout.sh" -b "$HOME/.docker/cli-plugins" v1.27.0
+
+      - name: Install pinned OpenVEX validator and attestation tool
+        if: ${{ matrix.type == 'fpm-hardened' }}
+        run: |
+          GOBIN="$RUNNER_TEMP/vexctl-bin" go install github.com/openvex/vexctl@9f3461445f0ab76553eac55132a9084a2d1a4e63
+          GOBIN="$RUNNER_TEMP/vexctl-bin" go install oras.land/oras/cmd/oras@v1.3.6
+          echo "$RUNNER_TEMP/vexctl-bin" >> "$GITHUB_PATH"
+
+      - name: Publish verified DHI VEX exceptions for hardened image
+        if: ${{ matrix.type == 'fpm-hardened' }}
+        env:
+          IMAGE_DIGEST: ${{ steps.push-image.outputs.digest }}
+        run: |
+          python3 .github/scripts/dhi_vex.py \
+            --image "${IMAGE_REPO}:${IMAGE_TAG}@${IMAGE_DIGEST}" \
+            --expected-base "$RUNTIME_BASE_REF" \
+            --output-dir vex-reports --publish
+
+      - name: Save hardened VEX evidence
+        if: ${{ always() && matrix.type == 'fpm-hardened' }}
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: vex-${{ matrix.version }}
+          path: vex-reports/
+          retention-days: 30
+          if-no-files-found: warn
+
       - name: Smoke test published hardened PHP extensions
         if: ${{ matrix.type == 'fpm-hardened' }}
         run: |

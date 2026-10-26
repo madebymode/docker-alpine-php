@@ -23,6 +23,13 @@ class ScanImagesTests(unittest.TestCase):
         self.environment = patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": str(self.root / "summary")})
         self.environment.start()
         self.addCleanup(self.environment.stop)
+        self.vex = {
+            platform: {"vex": str(self.root / f"{platform.split('/')[1]}.vex.json")}
+            for platform in scanner.PLATFORMS
+        }
+        self.prepare = patch.object(scanner.dhi_vex, "prepare", return_value=self.vex).start()
+        self.publish = patch.object(scanner.dhi_vex, "publish").start()
+        self.addCleanup(patch.stopall)
 
     def add_image(self, kind, version, extra=""):
         directory = self.root / kind / version
@@ -82,9 +89,9 @@ class ScanImagesTests(unittest.TestCase):
         for platform in scanner.PLATFORMS:
             self.statuses[(reference, platform)] = 2
         self.assertEqual(self.scan("fpm-hardened"), ([{"type": "fpm-hardened", "version": "8.5"}], [], set()))
-        self.assertEqual(len(self.commands), 3)
+        self.assertEqual(len(self.commands), 5)
 
-    def test_inherited_fix_selects_standard_images_and_preserves_dhi_filter(self):
+    def test_vex_exclusions_do_not_retrigger_hardened_builds(self):
         for kind in scanner.IMAGE_TYPES:
             self.add_image(kind, "8.5")
         output = self.root / "outputs"
@@ -92,7 +99,7 @@ class ScanImagesTests(unittest.TestCase):
         def inherited_finding(command, **kwargs):
             result = self.docker(command, **kwargs)
             if command[1] == "scout":
-                result.returncode = 0 if "--ignore-base" in command else 2
+                result.returncode = 0 if "--only-vex-affected" in command else 2
                 report = Path(command[command.index("--output") + 1])
                 report.write_text("CVE-2026-92392\n" if result.returncode == 2 else "")
             return result
@@ -115,7 +122,58 @@ class ScanImagesTests(unittest.TestCase):
         scans = [command for command in self.commands if command[1] == "scout"]
         self.assertEqual(len(scans), 6)
         for command in scans:
-            self.assertEqual("--ignore-base" in command, "fpm-hardened" in command[3])
+            self.assertNotIn("--ignore-base", command)
+            self.assertEqual("--only-vex-affected" in command, "fpm-hardened" in command[3])
+            if "fpm-hardened" in command[3]:
+                platform = command[command.index("--platform") + 1]
+                self.assertEqual(command[command.index("--vex-location") + 1], self.vex[platform]["vex"])
+
+    def test_only_excluded_cves_emit_no_rebuild_and_no_release_cves(self):
+        self.add_image("fpm-hardened", "8.5")
+        output = self.root / "outputs"
+        with (
+            patch.object(scanner, "REPO_ROOT", self.root),
+            patch.object(scanner.subprocess, "run", side_effect=self.docker),
+            patch.dict(os.environ, {"GITHUB_OUTPUT": str(output)}),
+            patch("sys.argv", ["scan", "--reports-dir", str(self.reports), "--publish-vex"]),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(scanner.main(), 0)
+        outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
+        self.assertEqual(outputs["has_fixes"], "false")
+        self.assertEqual(outputs["matrix"], "[]")
+        self.assertEqual(outputs["cve_list"], "")
+        self.publish.assert_called_once()
+
+    def test_vex_verification_or_publication_failure_blocks_rebuild_outputs(self):
+        self.add_image("fpm-hardened", "8.5")
+        for operation in (self.prepare, self.publish):
+            with self.subTest(operation=operation):
+                operation.side_effect = ValueError("invalid VEX")
+                matrix, errors, cve_ids = scanner.scan_images(self.root, self.reports, "all", True)
+                self.assertEqual(matrix, [])
+                self.assertTrue(errors)
+                self.assertEqual(cve_ids, set())
+                operation.side_effect = None
+        self.assertFalse(any(command[1] == "scout" for command in self.commands))
+
+    def test_unassessed_base_cves_are_reported_without_rebuilding_the_same_pin(self):
+        self.add_image("fpm-hardened", "8.5")
+        self.prepare.return_value = {platform: {"vex": ""} for platform in scanner.PLATFORMS}
+
+        def base_finding(command, **kwargs):
+            result = self.docker(command, **kwargs)
+            if command[1] == "scout":
+                result.returncode = 0 if "--ignore-base" in command else 2
+                Path(command[command.index("--output") + 1]).write_text("" if result.returncode == 0 else "CVE-2026-92392")
+            return result
+
+        with patch.object(scanner.subprocess, "run", side_effect=base_finding):
+            matrix, errors, cve_ids = scanner.scan_images(self.root, self.reports, "all")
+        self.assertEqual((matrix, errors, cve_ids), ([], [], set()))
+        self.assertIn("CVE-2026-92392", (self.reports / "fpm-hardened-8.5-amd64.md").read_text())
+        self.assertIn("waiting for a DHI digest update", (self.reports / "summary.md").read_text())
+        self.assertTrue(all("--vex-location" not in command for command in self.commands))
 
     def test_scanner_failure_blocks_workflow_outputs(self):
         self.add_image("cli", "8.5")

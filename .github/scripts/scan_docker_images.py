@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from update_php_alpine_versions import parse_env_file
+import dhi_vex
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 IMAGE_TYPES = ("cli", "fpm", "fpm-hardened")
@@ -34,7 +35,7 @@ def extract_cve_ids(report: Path) -> set[str]:
     return set(re.findall(r'\bCVE-\d{4}-\d{4,}\b', report.read_text()))
 
 
-def scan_images(repo_root: Path, reports_dir: Path, image_type: str) -> tuple[list[dict[str, str]], list[str], set[str]]:
+def scan_images(repo_root: Path, reports_dir: Path, image_type: str, publish_vex: bool = False) -> tuple[list[dict[str, str]], list[str], set[str]]:
     reports_dir.mkdir(parents=True, exist_ok=True)
     matrix: list[dict[str, str]] = []
     errors: list[str] = []
@@ -67,6 +68,18 @@ def scan_images(repo_root: Path, reports_dir: Path, image_type: str) -> tuple[li
                 summary.append(f"| `{reference}` | both | Registry lookup failed |")
                 continue
 
+            vex = {}
+            if kind == "fpm-hardened":
+                try:
+                    vex_dir = reports_dir / f"{prefix}-vex"
+                    vex = dhi_vex.prepare(f"{reference}@{digest}", vex_dir)
+                    if publish_vex:
+                        dhi_vex.publish(vex, vex_dir)
+                except (subprocess.SubprocessError, ValueError, KeyError, StopIteration, OSError) as exc:
+                    errors.append(f"VEX preparation/publication failed for {reference}: {exc}; see {prefix}-vex/")
+                    summary.append(f"| `{reference}@{digest}` | both | VEX failed; rebuild decisions skipped |")
+                    continue
+
             fixable = False
             # Both architectures must be scanned from the same immutable manifest.
             for platform in PLATFORMS:
@@ -77,21 +90,35 @@ def scan_images(repo_root: Path, reports_dir: Path, image_type: str) -> tuple[li
                     "--only-severity", "high,critical", "--exit-code",
                     "--format", "markdown", "--output", str(report),
                 ]
-                # Standard images upgrade inherited packages; DHI bases stay pinned.
                 if kind == "fpm-hardened":
-                    command.append("--ignore-base")
+                    if vex[platform]["vex"]:
+                        command.extend(["--vex-location", vex[platform]["vex"]])
+                    command.extend(["--only-vex-affected",
+                                    "--vex-author", "<.*@docker.com>", "--vex-author", "^https://github[.]com/madebymode$"])
                 try:
                     result = subprocess.run(command, capture_output=True, text=True, timeout=600)
                     report.with_suffix(".log").write_text(result.stdout + result.stderr)
+                    decision_report = report
+                    base_only = False
+                    if result.returncode == 2 and kind == "fpm-hardened":
+                        # Keep base CVEs in the audit report. Rebuilding the same
+                        # pinned DHI cannot fix them; the digest updater owns that.
+                        decision_report = report.with_name(report.stem + "-rebuild.md")
+                        rebuild_command = command.copy()
+                        rebuild_command[rebuild_command.index("--output") + 1] = str(decision_report)
+                        rebuild_command.append("--ignore-base")
+                        result = subprocess.run(rebuild_command, capture_output=True, text=True, timeout=600)
+                        decision_report.with_suffix(".log").write_text(result.stdout + result.stderr)
+                        base_only = result.returncode == 0
                     if result.returncode == 0:
-                        status = "No fixable CVEs"
+                        status = "Base CVEs remain visible; waiting for a DHI digest update" if base_only else "No fixable CVEs"
                     elif result.returncode == 2:
                         status = "Fixes available; rebuild requested"
                         fixable = True
-                        cve_ids.update(extract_cve_ids(report))
+                        cve_ids.update(extract_cve_ids(decision_report))
                     else:
                         status = f"Scan failed (exit {result.returncode})"
-                        errors.append(f"{reference} ({platform}): {status}; see {report.with_suffix('.log').name}")
+                        errors.append(f"{reference} ({platform}): {status}; see {decision_report.with_suffix('.log').name}")
                 except subprocess.TimeoutExpired:
                     status = "Scan timed out"
                     errors.append(f"{reference} ({platform}): {status}")
@@ -116,8 +143,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image-type", choices=("all", *IMAGE_TYPES), default="all")
     parser.add_argument("--reports-dir", type=Path, default=Path("scout-reports"))
+    parser.add_argument("--publish-vex", action="store_true", help="Refresh hardened-image VEX attestations without rebuilding")
     args = parser.parse_args()
-    matrix, errors, cve_ids = scan_images(REPO_ROOT, args.reports_dir, args.image_type)
+    matrix, errors, cve_ids = scan_images(REPO_ROOT, args.reports_dir, args.image_type, args.publish_vex)
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)

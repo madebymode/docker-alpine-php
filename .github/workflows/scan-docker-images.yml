@@ -49,15 +49,28 @@ jobs:
       - name: Install Docker Scout
         run: |
           curl --fail --silent --show-error --location \
-            https://raw.githubusercontent.com/docker/scout-cli/v1.20.3/install.sh \
+            https://raw.githubusercontent.com/docker/scout-cli/v1.27.0/install.sh \
             --output "$RUNNER_TEMP/install-scout.sh"
-          sh "$RUNNER_TEMP/install-scout.sh" -b "$HOME/.docker/cli-plugins" v1.20.3
+          sh "$RUNNER_TEMP/install-scout.sh" -b "$HOME/.docker/cli-plugins" v1.27.0
+
+      - name: Install pinned OpenVEX validator and attestation tool
+        run: |
+          GOBIN="$RUNNER_TEMP/vexctl-bin" go install github.com/openvex/vexctl@9f3461445f0ab76553eac55132a9084a2d1a4e63
+          GOBIN="$RUNNER_TEMP/vexctl-bin" go install oras.land/oras/cmd/oras@v1.3.6
+          echo "$RUNNER_TEMP/vexctl-bin" >> "$GITHUB_PATH"
+
+      - name: Log in to DHI
+        uses: docker/login-action@v4.0.0
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
       - name: Scan published images for fixable CVEs
         id: scan
         env:
           IMAGE_TYPE: ${{ inputs.image_type || 'all' }}
-        run: python3 .github/scripts/scan_docker_images.py --image-type "$IMAGE_TYPE"
+        run: python3 .github/scripts/scan_docker_images.py --image-type "$IMAGE_TYPE" --publish-vex
 
       - name: Save Scout reports
         if: always()
