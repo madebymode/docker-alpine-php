@@ -138,6 +138,90 @@ docker buildx imagetools inspect mxmd/php:8.5-fpm \
   --format '{{ json .SBOM.SPDX }}'
 ```
 
+### Viewing Hardened Image OpenVEX
+
+Use Docker Scout to download the published OpenVEX for a hardened image, then
+`jq` to read it. These commands run on your host; they do not start a container.
+Install the [Docker Scout CLI](https://docs.docker.com/scout/install/) and `jq`
+first, and use `docker login` if Docker Hub requests authentication.
+
+```bash
+# Choose a hardened PHP tag (8.2, 8.3, 8.4, or 8.5) and platform.
+IMAGE=mxmd/php:fpm-hardened-8.5
+PLATFORM=linux/amd64
+
+docker scout vex get "registry://$IMAGE" \
+  --platform "$PLATFORM" --output image.vex.json
+
+# Read the complete document, including author and assessment timestamps.
+jq . image.vex.json
+
+# Summarize each CVE, its status, package scope, and supporting explanation.
+jq '.statements[] | {
+  cve: .vulnerability.name,
+  status,
+  justification,
+  impact_statement,
+  status_notes,
+  products
+}' image.vex.json
+```
+
+Set `PLATFORM=linux/arm64` to inspect that architecture instead. Assessments are
+published against separate platform digests. Scout's export can include image
+tag and package selectors in `products`; inspect these and any `subcomponents`
+for package scope. For a repeatable audit, set `IMAGE` to the digest-pinned
+reference from your release or deployment. A rolling tag can move to a newer
+build. If a Docker Hub VEX download link returns 404, use the `docker scout vex
+get` command above to export the registry artifact directly.
+
+The document's author is `https://github.com/madebymode`. Each statement's
+`status_notes` identifies the verified upstream DHI assessment used to derive
+it. Read `justification` and `impact_statement` alongside the status:
+
+| Status | Meaning |
+| --- | --- |
+| `not_affected` | The scoped product is assessed as unaffected; the justification explains why. |
+| `affected` | The scoped product is affected; consult any `action_statement` for remediation. |
+| `fixed` | The vulnerability has been fixed in the scoped product. |
+| `under_investigation` | The impact assessment is still in progress. |
+
+A CVE absent from the document has no assessment in that document. If no VEX is
+published for an image, scanner findings remain visible.
+
+To validate the downloaded document, install the same vexctl revision used by
+CI (requires Go), with Go's binary directory on your `PATH`:
+
+```bash
+go install github.com/openvex/vexctl@9f3461445f0ab76553eac55132a9084a2d1a4e63
+vexctl version
+vexctl validate --strict image.vex.json
+```
+
+For the original documents before Scout export, download the release workflow's
+`vex-<PHP version>` artifact from GitHub Actions. It includes `amd64.vex.json`
+and `arm64.vex.json`, their in-toto attestations, upstream evidence, and
+`sources.json` mapping the image and base digests. These original child-image
+documents are the ones CI validates with `--strict`.
+
+Validation checks the OpenVEX document's structure and rules; it does not verify
+the publisher's signature. Scout's `--verify` option defaults to Docker's DHI
+signing key and is used by our pipeline for the upstream DHI document. Our
+derived child-image document is issued under our own author identity.
+
+To apply the downloaded assessments to a scan of the same image and platform:
+
+```bash
+docker scout cves "registry://$IMAGE" --platform "$PLATFORM" \
+  --vex-location image.vex.json \
+  --vex-author '^https://github[.]com/madebymode$' --only-vex-affected
+```
+
+See [Chainguard's OpenVEX and vexctl guide](https://edu.chainguard.dev/open-source/sbom/getting-started-openvex-vexctl/)
+for more on creating, merging, and attesting VEX documents, and
+[Docker's VEX retrieval reference](https://docs.docker.com/reference/cli/docker/scout/vex/get/)
+for download and signature-verification options.
+
 ### Immutable Digest Releases
 
 Every published image creates a GitHub Release tagged with the immutable manifest digest (e.g. `8.5-fpm-sha256-abc123...`). These releases include the Docker digest, all published tags, and digest-pinned pull references. Use the digest reference to guarantee you pull exactly what was built:
@@ -180,8 +264,8 @@ docker scout cves registry://mxmd/php:fpm-hardened-8.5 \
   --vex-author '^https://github[.]com/madebymode$' --only-vex-affected
 ```
 
-If a Docker Hub VEX download link returns 404, export the registry artifact with
-`docker scout vex get registry://mxmd/php:fpm-hardened-8.5 --platform linux/amd64 --output image.vex.json`.
+For downloading, reading, validating, and applying the published assessments,
+see [Viewing Hardened Image OpenVEX](#viewing-hardened-image-openvex).
 
 See [SECURITY.md](SECURITY.md) for the security policy, backport build process,
 validation results, [upstream regression tests you can run](SECURITY.md#run-the-upstream-regression-tests-yourself),
