@@ -13,6 +13,7 @@ from pathlib import Path
 
 from update_php_alpine_versions import parse_env_file
 import dhi_vex
+import verify_fixes
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 IMAGE_TYPES = ("cli", "fpm", "fpm-hardened")
@@ -42,6 +43,7 @@ def scan_images(repo_root: Path, reports_dir: Path, image_type: str, publish_vex
     cve_ids: set[str] = set()
     summary = ["| Image | Platform | Result |", "| --- | --- | --- |"]
     scanned = 0
+    apk_index_cache: dict[tuple[str, str], dict[str, str]] = {}
 
     for kind in IMAGE_TYPES:
         if image_type != "all" and kind != image_type:
@@ -53,6 +55,7 @@ def scan_images(repo_root: Path, reports_dir: Path, image_type: str, publish_vex
             version = env_file.parent.name
             reference = image_reference(env_file)
             prefix = f"{kind}-{version}"
+            alpine_version = parse_env_file(env_file).get("ALPINE_VERSION", "")
             try:
                 resolved = subprocess.run(
                     ["docker", "buildx", "imagetools", "inspect", reference, "--format", "{{.Manifest.Digest}}"],
@@ -114,9 +117,33 @@ def scan_images(repo_root: Path, reports_dir: Path, image_type: str, publish_vex
                     if result.returncode == 0:
                         status = "Base CVEs remain visible; waiting for a DHI digest update" if base_only else "No fixable CVEs"
                     elif result.returncode == 2:
-                        status = "Fixes available; rebuild requested"
-                        fixable = True
-                        cve_ids.update(extract_cve_ids(decision_report))
+                        # Verify fixes are actually in the Alpine repos before rebuilding.
+                        verified = True
+                        if alpine_version and decision_report.is_file():
+                            try:
+                                cache_key = (alpine_version, platform)
+                                if cache_key not in apk_index_cache:
+                                    apk_index_cache[cache_key] = verify_fixes.fetch_apk_index(alpine_version, platform)
+                                vr = verify_fixes.verify_report(
+                                    decision_report, alpine_version, platform, apk_index_cache[cache_key],
+                                )
+                                if not vr.available:
+                                    verified = False
+                                    phantom_pkgs = {f.package for f in vr.phantom}
+                                    print(
+                                        f"{reference} ({platform}): phantom fixes — "
+                                        f"{', '.join(sorted(phantom_pkgs))} not updated in Alpine v{alpine_version} repos",
+                                        flush=True,
+                                    )
+                            except Exception as exc:
+                                # Verification failure: trust Scout's original assessment.
+                                print(f"WARNING: fix verification failed for {reference} ({platform}): {exc}", flush=True)
+                        if verified:
+                            status = "Fixes available; rebuild requested"
+                            fixable = True
+                            cve_ids.update(extract_cve_ids(decision_report))
+                        else:
+                            status = "Phantom fixes (not yet in Alpine repos); rebuild skipped"
                     else:
                         status = f"Scan failed (exit {result.returncode})"
                         errors.append(f"{reference} ({platform}): {status}; see {decision_report.with_suffix('.log').name}")

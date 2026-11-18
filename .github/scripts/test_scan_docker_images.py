@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import scan_docker_images as scanner
+import verify_fixes
 
 
 class ScanImagesTests(unittest.TestCase):
@@ -29,6 +30,17 @@ class ScanImagesTests(unittest.TestCase):
         }
         self.prepare = patch.object(scanner.dhi_vex, "prepare", return_value=self.vex).start()
         self.publish = patch.object(scanner.dhi_vex, "publish").start()
+        # Default: verification confirms fixes are real (tests override for phantom-fix scenarios)
+        self._verify_result = verify_fixes.VerifyResult(
+            available=[verify_fixes.ApkFix("CVE-0000-00000", "pkg", "1.0-r0", "1.0-r1")],
+        )
+        self._verify_patch = patch.object(
+            scanner.verify_fixes, "fetch_apk_index", return_value={}
+        ).start()
+        self._verify_report_patch = patch.object(
+            scanner.verify_fixes, "verify_report",
+            side_effect=lambda *a, **kw: self._verify_result,
+        ).start()
         self.addCleanup(patch.stopall)
 
     def add_image(self, kind, version, extra=""):
@@ -228,6 +240,51 @@ class ScanImagesTests(unittest.TestCase):
         outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
         self.assertEqual(outputs["has_fixes"], "true")
         self.assertEqual(json.loads(outputs["matrix"]), [{"type": "cli", "version": "8.5"}])
+
+
+    def test_phantom_fixes_skip_rebuild(self):
+        self.add_image("cli", "8.5")
+        reference = f"registry://mxmd/php:8.5-cli@{self.digest}"
+        self.statuses[(reference, "linux/amd64")] = 2
+        # Verification finds no real fixes — all are phantom
+        self._verify_result = verify_fixes.VerifyResult(
+            phantom=[verify_fixes.ApkFix("CVE-2026-95691", "openssl", "3.5.9-r0", "3.5.9-r1")],
+        )
+        matrix, errors, cve_ids = self.scan()
+        self.assertEqual(matrix, [])
+        self.assertEqual(errors, [])
+        self.assertEqual(cve_ids, set())
+        self.assertIn("Phantom fixes", (self.reports / "summary.md").read_text())
+
+    def test_phantom_fixes_on_one_platform_real_on_other_triggers_rebuild(self):
+        self.add_image("cli", "8.5")
+        reference = f"registry://mxmd/php:8.5-cli@{self.digest}"
+        for platform in scanner.PLATFORMS:
+            self.statuses[(reference, platform)] = 2
+
+        call_count = [0]
+        real = verify_fixes.VerifyResult(
+            available=[verify_fixes.ApkFix("CVE-2026-95691", "openssl", "3.5.9-r0", "3.5.9-r1")],
+        )
+        phantom = verify_fixes.VerifyResult(
+            phantom=[verify_fixes.ApkFix("CVE-2026-95691", "openssl", "3.5.9-r0", "3.5.9-r1")],
+        )
+
+        def alternating(*a, **kw):
+            call_count[0] += 1
+            return real if call_count[0] == 1 else phantom
+
+        self._verify_report_patch.side_effect = alternating
+        matrix, errors, cve_ids = self.scan()
+        self.assertEqual(matrix, [{"type": "cli", "version": "8.5"}])
+
+    def test_verification_failure_trusts_scout(self):
+        self.add_image("cli", "8.5")
+        reference = f"registry://mxmd/php:8.5-cli@{self.digest}"
+        self.statuses[(reference, "linux/amd64")] = 2
+        self._verify_report_patch.side_effect = RuntimeError("network error")
+        matrix, errors, cve_ids = self.scan()
+        self.assertEqual(matrix, [{"type": "cli", "version": "8.5"}])
 
 
 if __name__ == "__main__":
